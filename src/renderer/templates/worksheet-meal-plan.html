@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}} — Weekly Meal Planner</title>
+  <style>
+    {{designSystemCss}}
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      font-family: var(--font-body);
+      font-size: var(--font-size-base);
+      color: var(--color-text);
+      background: var(--color-background);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    @media print {
+      .page { page-break-after: always; page-break-inside: avoid; }
+      .page:last-child { page-break-after: auto; }
+    }
+
+    @page { size: A4 portrait; margin: 15mm; }
+
+    .page {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      padding: 15mm;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ──────────────────────────────────────────────── */
+    .meal-header {
+      text-align: center;
+      margin-bottom: var(--space-md);
+      padding-bottom: var(--space-sm);
+      border-bottom: 3px solid var(--color-primary);
+    }
+
+    .meal-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-2xl);
+      color: var(--color-primary);
+    }
+
+    .meal-header .date-range {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+      font-style: italic;
+      margin-top: var(--space-xs);
+    }
+
+    /* ── Meal Grid ───────────────────────────────────────────── */
+    .meal-grid {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: var(--space-md);
+      font-size: var(--font-size-xs);
+    }
+
+    .meal-grid th {
+      font-family: var(--font-heading);
+      font-size: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      padding: 4px 3px;
+      text-align: center;
+      font-weight: 700;
+    }
+
+    .meal-grid th.day-col {
+      color: var(--color-primary);
+      border-bottom: 2px solid var(--color-primary);
+    }
+
+    .meal-grid th.meal-type {
+      color: var(--color-text-muted);
+      border-bottom: 2px solid var(--color-border);
+      width: 52px;
+      writing-mode: horizontal-tb;
+    }
+
+    .meal-grid td {
+      border: 1px solid var(--color-border-light);
+      padding: 3px;
+      min-height: 32px;
+      vertical-align: top;
+    }
+
+    .meal-grid td.day-label {
+      font-family: var(--font-heading);
+      font-weight: 700;
+      font-size: var(--font-size-xs);
+      color: var(--color-primary);
+      text-align: center;
+      vertical-align: middle;
+      background: var(--color-surface);
+      width: 52px;
+      border-left: 3px solid var(--color-primary);
+    }
+
+    .meal-grid tr:nth-child(even) td:not(.day-label) {
+      background: rgba(0, 0, 0, 0.01);
+    }
+
+    /* ── Bottom Layout ───────────────────────────────────────── */
+    .bottom-layout {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-md);
+    }
+
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-xs);
+      font-weight: 700;
+      color: var(--color-primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-sm);
+      padding-bottom: var(--space-xs);
+      border-bottom: 1px solid var(--color-border-light);
+    }
+
+    /* ── Grocery List ────────────────────────────────────────── */
+    .grocery-section {
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm);
+    }
+
+    .grocery-columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-sm);
+    }
+
+    .grocery-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+
+    .grocery-checkbox {
+      width: 10px;
+      height: 10px;
+      border: 1.5px solid var(--color-border);
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    .grocery-line {
+      flex: 1;
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 14px;
+    }
+
+    /* ── Meal Prep Notes ─────────────────────────────────────── */
+    .prep-section {
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm);
+    }
+
+    .note-line {
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 18px;
+      margin-bottom: 6px;
+    }
+
+    /* ── Nutritional Goals ───────────────────────────────────── */
+    .nutrition-section {
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm);
+    }
+
+    .nutrition-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-xs) var(--space-md);
+    }
+
+    .nutrition-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 3px 0;
+      border-bottom: 1px solid var(--color-border-light);
+    }
+
+    .nutrition-label {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      font-weight: 600;
+    }
+
+    .nutrition-value {
+      border-bottom: 1px solid var(--color-border);
+      min-width: 50px;
+      min-height: 16px;
+      text-align: center;
+    }
+
+    /* ── Recipe Ideas ────────────────────────────────────────── */
+    .recipe-section {
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm);
+      border-left: 4px solid var(--color-secondary);
+    }
+
+    .recipe-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      margin-bottom: 5px;
+    }
+
+    .recipe-bullet {
+      width: 6px;
+      height: 6px;
+      background: var(--color-secondary);
+      border-radius: 50%;
+      flex-shrink: 0;
+      opacity: 0.5;
+    }
+
+    .recipe-line {
+      flex: 1;
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 14px;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────── */
+    .page-footer {
+      margin-top: auto;
+      padding-top: var(--space-sm);
+      border-top: 1px solid var(--color-border-light);
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div class="page" data-page="{{pageNumber}}">
+    <!-- Header -->
+    <div class="meal-header">
+      <h1>{{title}}</h1>
+      <div class="date-range">Week of _____ / _____ / _____</div>
+    </div>
+
+    <!-- 7-Day Meal Grid -->
+    <table class="meal-grid">
+      <thead>
+        <tr>
+          <th class="meal-type"></th>
+          <th class="day-col">Breakfast</th>
+          <th class="day-col">Lunch</th>
+          <th class="day-col">Dinner</th>
+          <th class="day-col">Snacks</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="day-label">Mon</td><td></td><td></td><td></td><td></td></tr>
+        <tr><td class="day-label">Tue</td><td></td><td></td><td></td><td></td></tr>
+        <tr><td class="day-label">Wed</td><td></td><td></td><td></td><td></td></tr>
+        <tr><td class="day-label">Thu</td><td></td><td></td><td></td><td></td></tr>
+        <tr><td class="day-label">Fri</td><td></td><td></td><td></td><td></td></tr>
+        <tr><td class="day-label">Sat</td><td></td><td></td><td></td><td></td></tr>
+        <tr><td class="day-label">Sun</td><td></td><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+
+    <!-- Bottom Layout -->
+    <div class="bottom-layout">
+      <!-- Grocery List -->
+      <div class="grocery-section">
+        <div class="section-title">Grocery List</div>
+        <div class="grocery-columns">
+          <div>
+            <div class="grocery-item"><div class="grocery-checkbox"></div><div class="grocery-line"></div></div>
+            <div class="grocery-item"><div class="grocery-checkbox"></div><div class="grocery-line"></div></div>
+            <div class="grocery-item"><div class="grocery-checkbox"></div><div class="grocery-line"></div></div>
+            <div class="grocery-item"><div class="grocery-checkbox"></div><div class="grocery-line"></div></div>
+            <div class="grocery-item"><div class="grocery-checkbox"></div><div class="grocery-line"></div></div>
+            <div class="grocery-item"><div class="grocery-checkbox"></div><div class="grocery-line"></div></div>
+            <div class="grocery-item"><div class="grocery-checkbox"></div><div class="grocery-line"></div></div>
+            <div class="grocery-item"><div class="grocery-checkbox"></div><div class="grocery-line"></div></div>
+          </div>
+          <div>
+            <div class="grocery-item"><div class="grocery-checkbox"></div><div class="grocery-line"></div></div>
+            <div class="grocery-item"><div class="grocery-checkbox"></div><div class="grocery-line"></div></div>
+            <div class="grocery-item"><div class="grocery-checkbox"></div><div class="grocery-line"></div></div>
+            <div class="grocery-item"><div class="grocery-checkbox"></div><div class="grocery-line"></div></div>
+            <div class="grocery-item"><div class="grocery-checkbox"></div><div class="grocery-line"></div></div>
+            <div class="grocery-item"><div class="grocery-checkbox"></div><div class="grocery-line"></div></div>
+            <div class="grocery-item"><div class="grocery-checkbox"></div><div class="grocery-line"></div></div>
+            <div class="grocery-item"><div class="grocery-checkbox"></div><div class="grocery-line"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Prep + Nutrition + Recipes -->
+      <div style="display: flex; flex-direction: column; gap: var(--space-md);">
+        <!-- Meal Prep Notes -->
+        <div class="prep-section">
+          <div class="section-title">Meal Prep Notes</div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+        </div>
+
+        <!-- Nutritional Goals -->
+        <div class="nutrition-section">
+          <div class="section-title">Nutritional Goals</div>
+          <div class="nutrition-grid">
+            <div class="nutrition-item"><span class="nutrition-label">Calories</span><div class="nutrition-value"></div></div>
+            <div class="nutrition-item"><span class="nutrition-label">Protein</span><div class="nutrition-value"></div></div>
+            <div class="nutrition-item"><span class="nutrition-label">Carbs</span><div class="nutrition-value"></div></div>
+            <div class="nutrition-item"><span class="nutrition-label">Fats</span><div class="nutrition-value"></div></div>
+          </div>
+        </div>
+
+        <!-- Recipe Ideas -->
+        <div class="recipe-section">
+          <div class="section-title">Recipe Ideas</div>
+          <div class="recipe-item"><div class="recipe-bullet"></div><div class="recipe-line"></div></div>
+          <div class="recipe-item"><div class="recipe-bullet"></div><div class="recipe-line"></div></div>
+          <div class="recipe-item"><div class="recipe-bullet"></div><div class="recipe-line"></div></div>
+          <div class="recipe-item"><div class="recipe-bullet"></div><div class="recipe-line"></div></div>
+          <div class="recipe-item"><div class="recipe-bullet"></div><div class="recipe-line"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="page-footer">
+      <span>{{title}}</span>
+      <span>Page {{pageNumber}} of {{totalPages}}</span>
+    </div>
+  </div>
+</body>
+</html>

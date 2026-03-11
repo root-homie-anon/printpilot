@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}} — Mood Tracker</title>
+  <style>
+    {{designSystemCss}}
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      font-family: var(--font-body);
+      font-size: var(--font-size-base);
+      color: var(--color-text);
+      background: var(--color-background);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    @media print {
+      .page { page-break-after: always; page-break-inside: avoid; }
+      .page:last-child { page-break-after: auto; }
+    }
+
+    @page { size: A4 portrait; margin: 15mm; }
+
+    .page {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      padding: 15mm;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ──────────────────────────────────────────────── */
+    .mood-header {
+      text-align: center;
+      margin-bottom: var(--space-md);
+    }
+
+    .mood-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-2xl);
+      color: var(--color-primary);
+      margin-bottom: var(--space-xs);
+    }
+
+    .mood-header .month-label {
+      font-size: var(--font-size-lg);
+      color: var(--color-text-muted);
+    }
+
+    .month-input {
+      border-bottom: 2px solid var(--color-border);
+      display: inline-block;
+      min-width: 160px;
+      min-height: 24px;
+    }
+
+    /* ── Mood Legend ──────────────────────────────────────────── */
+    .mood-legend {
+      display: flex;
+      justify-content: center;
+      gap: var(--space-lg);
+      margin-bottom: var(--space-md);
+      padding: var(--space-sm) 0;
+      border-bottom: 1px solid var(--color-border-light);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+    }
+
+    .legend-circle {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 1.5px solid;
+    }
+
+    .legend-circle.great { border-color: #48BB78; background: rgba(72, 187, 120, 0.2); }
+    .legend-circle.good { border-color: #4A90D9; background: rgba(74, 144, 217, 0.2); }
+    .legend-circle.okay { border-color: #F6E05E; background: rgba(246, 224, 94, 0.2); }
+    .legend-circle.bad { border-color: #F6AD55; background: rgba(246, 173, 85, 0.2); }
+    .legend-circle.awful { border-color: #FC8181; background: rgba(252, 129, 129, 0.2); }
+
+    /* ── Monthly Mood Grid ───────────────────────────────────── */
+    .mood-grid-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: var(--space-md);
+      font-size: var(--font-size-xs);
+    }
+
+    .mood-grid-table th {
+      font-family: var(--font-heading);
+      font-size: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      padding: 3px 2px;
+      text-align: center;
+      color: var(--color-text-muted);
+      border-bottom: 2px solid var(--color-primary);
+      font-weight: 700;
+    }
+
+    .mood-grid-table th.day-col {
+      width: 22px;
+    }
+
+    .mood-grid-table th.mood-col {
+      width: 26px;
+    }
+
+    .mood-grid-table th.gratitude-col {
+      text-align: left;
+    }
+
+    .mood-grid-table th.sleep-col {
+      width: 34px;
+    }
+
+    .mood-grid-table td {
+      border-bottom: 1px solid var(--color-border-light);
+      padding: 2px;
+      text-align: center;
+      height: 18px;
+    }
+
+    .mood-grid-table td.day-num {
+      font-weight: 600;
+      color: var(--color-text-muted);
+      font-size: 9px;
+    }
+
+    .mood-grid-table td.mood-cell {
+      padding: 0;
+    }
+
+    .mood-circle {
+      width: 14px;
+      height: 14px;
+      border: 1.5px solid var(--color-border);
+      border-radius: 50%;
+      margin: 0 auto;
+    }
+
+    .mood-grid-table td.gratitude-cell {
+      text-align: left;
+      padding-left: var(--space-xs);
+    }
+
+    .gratitude-mini-line {
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 14px;
+    }
+
+    .mood-grid-table td.sleep-cell {
+      font-size: 9px;
+    }
+
+    .mood-grid-table tr:nth-child(even) {
+      background: var(--color-surface);
+    }
+
+    /* ── Pattern Section ─────────────────────────────────────── */
+    .bottom-sections {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-md);
+    }
+
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-xs);
+      font-weight: 700;
+      color: var(--color-primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-sm);
+      padding-bottom: var(--space-xs);
+      border-bottom: 1px solid var(--color-border-light);
+    }
+
+    .pattern-section {
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm);
+    }
+
+    .pattern-item {
+      margin-bottom: var(--space-sm);
+    }
+
+    .pattern-label {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .pattern-line {
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 18px;
+    }
+
+    /* ── Triggers/Notes ──────────────────────────────────────── */
+    .triggers-section {
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm);
+    }
+
+    .note-line {
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 18px;
+      margin-bottom: 6px;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────── */
+    .page-footer {
+      margin-top: auto;
+      padding-top: var(--space-sm);
+      border-top: 1px solid var(--color-border-light);
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div class="page" data-page="{{pageNumber}}">
+    <!-- Header -->
+    <div class="mood-header">
+      <h1>{{title}}</h1>
+      <div class="month-label">Month: <span class="month-input"></span></div>
+    </div>
+
+    <!-- Mood Legend -->
+    <div class="mood-legend">
+      <div class="legend-item"><div class="legend-circle great"></div>Great</div>
+      <div class="legend-item"><div class="legend-circle good"></div>Good</div>
+      <div class="legend-item"><div class="legend-circle okay"></div>Okay</div>
+      <div class="legend-item"><div class="legend-circle bad"></div>Bad</div>
+      <div class="legend-item"><div class="legend-circle awful"></div>Awful</div>
+    </div>
+
+    <!-- Monthly Mood Grid -->
+    <table class="mood-grid-table">
+      <thead>
+        <tr>
+          <th class="day-col">Day</th>
+          <th class="mood-col">Mood</th>
+          <th class="gratitude-col">Today I'm grateful for...</th>
+          <th class="sleep-col">Sleep (hrs)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="day-num">1</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">2</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">3</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">4</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">5</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">6</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">7</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">8</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">9</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">10</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">11</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">12</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">13</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">14</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">15</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">16</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">17</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">18</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">19</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">20</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">21</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">22</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">23</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">24</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">25</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">26</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">27</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">28</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">29</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">30</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+        <tr><td class="day-num">31</td><td class="mood-cell"><div class="mood-circle"></div></td><td class="gratitude-cell"><div class="gratitude-mini-line"></div></td><td class="sleep-cell"></td></tr>
+      </tbody>
+    </table>
+
+    <!-- Bottom Sections -->
+    <div class="bottom-sections">
+      <!-- Monthly Mood Patterns -->
+      <div class="pattern-section">
+        <div class="section-title">Monthly Mood Patterns</div>
+        <div class="pattern-item">
+          <div class="pattern-label">Most common mood</div>
+          <div class="pattern-line"></div>
+        </div>
+        <div class="pattern-item">
+          <div class="pattern-label">Best day of the week</div>
+          <div class="pattern-line"></div>
+        </div>
+        <div class="pattern-item">
+          <div class="pattern-label">Avg. sleep hours</div>
+          <div class="pattern-line"></div>
+        </div>
+        <div class="pattern-item">
+          <div class="pattern-label">Overall reflection</div>
+          <div class="pattern-line"></div>
+        </div>
+      </div>
+
+      <!-- Triggers / Notes -->
+      <div class="triggers-section">
+        <div class="section-title">Triggers & Notes</div>
+        <div class="note-line"></div>
+        <div class="note-line"></div>
+        <div class="note-line"></div>
+        <div class="note-line"></div>
+        <div class="note-line"></div>
+        <div class="note-line"></div>
+        <div class="note-line"></div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="page-footer">
+      <span>{{title}}</span>
+      <span>Page {{pageNumber}} of {{totalPages}}</span>
+    </div>
+  </div>
+</body>
+</html>

@@ -115,3 +115,34 @@ export interface AgentResult<T> {
   error?: string;
   duration: number;
 }
+
+export interface ScoreReport {
+  overallScore: number;
+  recommendation: string;
+  layout: number;
+  typography: number;
+  color: number;
+  differentiation: number;
+  sellability: number;
+}
+
+export interface PipelineResult {
+  productsProcessed: number;
+  approved: number;
+  listed: number;
+  errors: string[];
+}
+
+export interface SynthesisResult {
+  updatesApplied: number;
+  agentsUpdated: string[];
+  patternsExtracted: number;
+  changelogEntries: string[];
+  synthesizedAt: string;
+}
+
+export interface ApprovalDecision {
+  decision: FeedbackDecision;
+  feedback?: string;
+  decidedAt: string;
+}

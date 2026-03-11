@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}} — Daily Planner</title>
+  <style>
+    {{designSystemCss}}
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      font-family: var(--font-body);
+      font-size: var(--font-size-base);
+      color: var(--color-text);
+      background: var(--color-background);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    @media print {
+      .page { page-break-after: always; page-break-inside: avoid; }
+      .page:last-child { page-break-after: auto; }
+    }
+
+    @page { size: A4 portrait; margin: 15mm; }
+
+    .page {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      padding: 18mm 20mm;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ──────────────────────────────────────────────── */
+    .daily-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: var(--space-lg);
+      padding-bottom: var(--space-md);
+      border-bottom: 3px solid var(--color-primary);
+    }
+
+    .daily-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-2xl);
+      color: var(--color-primary);
+    }
+
+    .date-info {
+      text-align: right;
+    }
+
+    .date-info .day-of-week {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-lg);
+      color: var(--color-primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .date-info .date-line {
+      border-bottom: 2px solid var(--color-border);
+      min-width: 140px;
+      min-height: 24px;
+      margin-top: var(--space-xs);
+    }
+
+    /* ── Main Content Grid ───────────────────────────────────── */
+    .content-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-md);
+    }
+
+    /* ── Schedule Section ────────────────────────────────────── */
+    .schedule-section {
+      grid-row: 1 / 3;
+    }
+
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-sm);
+      font-weight: 700;
+      color: var(--color-primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-sm);
+      padding-bottom: var(--space-xs);
+      border-bottom: 1px solid var(--color-border-light);
+    }
+
+    .time-slot {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      min-height: 22px;
+      border-bottom: 1px solid var(--color-border-light);
+    }
+
+    .time-label {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      font-weight: 600;
+      min-width: 42px;
+      flex-shrink: 0;
+    }
+
+    .time-content {
+      flex: 1;
+      min-height: 20px;
+    }
+
+    /* ── Priorities Section ──────────────────────────────────── */
+    .priorities-section {
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm);
+      border-left: 4px solid var(--color-primary);
+    }
+
+    .priority-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      margin-bottom: var(--space-sm);
+    }
+
+    .priority-number {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-lg);
+      color: var(--color-primary);
+      opacity: 0.4;
+      font-weight: 700;
+      min-width: 20px;
+    }
+
+    .priority-line {
+      flex: 1;
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 20px;
+    }
+
+    /* ── To-Do Section ───────────────────────────────────────── */
+    .todo-section {
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm);
+    }
+
+    .todo-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      margin-bottom: 6px;
+    }
+
+    .todo-checkbox {
+      width: 12px;
+      height: 12px;
+      border: 1.5px solid var(--color-border);
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    .todo-line {
+      flex: 1;
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 16px;
+    }
+
+    /* ── Water Tracker ───────────────────────────────────────── */
+    .water-section {
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm);
+    }
+
+    .water-glasses {
+      display: flex;
+      gap: var(--space-sm);
+      justify-content: center;
+      margin-top: var(--space-xs);
+    }
+
+    .water-glass {
+      width: 22px;
+      height: 28px;
+      border: 1.5px solid var(--color-primary);
+      border-radius: 0 0 4px 4px;
+      opacity: 0.5;
+    }
+
+    /* ── Notes Section ───────────────────────────────────────── */
+    .notes-section {
+      grid-column: 1 / -1;
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm);
+    }
+
+    .note-line {
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 20px;
+      margin-bottom: 6px;
+    }
+
+    /* ── Affirmation Section ─────────────────────────────────── */
+    .affirmation-section {
+      grid-column: 1 / -1;
+      background: var(--color-surface);
+      border-radius: 6px;
+      padding: var(--space-sm) var(--space-md);
+      text-align: center;
+    }
+
+    .affirmation-label {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-xs);
+    }
+
+    .affirmation-line {
+      border-bottom: 1px solid var(--color-border);
+      min-height: 24px;
+      max-width: 80%;
+      margin: 0 auto;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────── */
+    .page-footer {
+      margin-top: var(--space-md);
+      padding-top: var(--space-sm);
+      border-top: 1px solid var(--color-border-light);
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div class="page" data-page="{{pageNumber}}">
+    <!-- Header -->
+    <div class="daily-header">
+      <h1>{{title}}</h1>
+      <div class="date-info">
+        <div class="day-of-week">___________</div>
+        <div class="date-line"></div>
+      </div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="content-grid">
+      <!-- Schedule (left column, spanning two rows) -->
+      <div class="schedule-section">
+        <div class="section-title">Schedule</div>
+        <div class="time-slot"><span class="time-label">6 AM</span><div class="time-content"></div></div>
+        <div class="time-slot"><span class="time-label">7 AM</span><div class="time-content"></div></div>
+        <div class="time-slot"><span class="time-label">8 AM</span><div class="time-content"></div></div>
+        <div class="time-slot"><span class="time-label">9 AM</span><div class="time-content"></div></div>
+        <div class="time-slot"><span class="time-label">10 AM</span><div class="time-content"></div></div>
+        <div class="time-slot"><span class="time-label">11 AM</span><div class="time-content"></div></div>
+        <div class="time-slot"><span class="time-label">12 PM</span><div class="time-content"></div></div>
+        <div class="time-slot"><span class="time-label">1 PM</span><div class="time-content"></div></div>
+        <div class="time-slot"><span class="time-label">2 PM</span><div class="time-content"></div></div>
+        <div class="time-slot"><span class="time-label">3 PM</span><div class="time-content"></div></div>
+        <div class="time-slot"><span class="time-label">4 PM</span><div class="time-content"></div></div>
+        <div class="time-slot"><span class="time-label">5 PM</span><div class="time-content"></div></div>
+        <div class="time-slot"><span class="time-label">6 PM</span><div class="time-content"></div></div>
+        <div class="time-slot"><span class="time-label">7 PM</span><div class="time-content"></div></div>
+        <div class="time-slot"><span class="time-label">8 PM</span><div class="time-content"></div></div>
+        <div class="time-slot"><span class="time-label">9 PM</span><div class="time-content"></div></div>
+      </div>
+
+      <!-- Top 3 Priorities (right column, row 1) -->
+      <div class="priorities-section">
+        <div class="section-title">Top 3 Priorities</div>
+        <div class="priority-item"><span class="priority-number">1</span><div class="priority-line"></div></div>
+        <div class="priority-item"><span class="priority-number">2</span><div class="priority-line"></div></div>
+        <div class="priority-item"><span class="priority-number">3</span><div class="priority-line"></div></div>
+      </div>
+
+      <!-- To-Do List (right column, row 2) -->
+      <div class="todo-section">
+        <div class="section-title">To Do</div>
+        <div class="todo-item"><div class="todo-checkbox"></div><div class="todo-line"></div></div>
+        <div class="todo-item"><div class="todo-checkbox"></div><div class="todo-line"></div></div>
+        <div class="todo-item"><div class="todo-checkbox"></div><div class="todo-line"></div></div>
+        <div class="todo-item"><div class="todo-checkbox"></div><div class="todo-line"></div></div>
+        <div class="todo-item"><div class="todo-checkbox"></div><div class="todo-line"></div></div>
+        <div class="todo-item"><div class="todo-checkbox"></div><div class="todo-line"></div></div>
+        <div class="todo-item"><div class="todo-checkbox"></div><div class="todo-line"></div></div>
+        <div class="todo-item"><div class="todo-checkbox"></div><div class="todo-line"></div></div>
+        <div class="todo-item"><div class="todo-checkbox"></div><div class="todo-line"></div></div>
+        <div class="todo-item"><div class="todo-checkbox"></div><div class="todo-line"></div></div>
+      </div>
+
+      <!-- Water Intake Tracker -->
+      <div class="water-section">
+        <div class="section-title">Water Intake</div>
+        <div class="water-glasses">
+          <div class="water-glass"></div>
+          <div class="water-glass"></div>
+          <div class="water-glass"></div>
+          <div class="water-glass"></div>
+          <div class="water-glass"></div>
+          <div class="water-glass"></div>
+          <div class="water-glass"></div>
+          <div class="water-glass"></div>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="notes-section">
+        <div class="section-title">Notes</div>
+        <div class="note-line"></div>
+        <div class="note-line"></div>
+        <div class="note-line"></div>
+        <div class="note-line"></div>
+      </div>
+
+      <!-- Today's Affirmation -->
+      <div class="affirmation-section">
+        <div class="affirmation-label">Today's Affirmation</div>
+        <div class="affirmation-line"></div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="page-footer">
+      <span>{{title}}</span>
+      <span>Page {{pageNumber}} of {{totalPages}}</span>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}} — Reading Log</title>
+  <style>
+    {{designSystemCss}}
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      font-family: var(--font-body);
+      font-size: var(--font-size-base);
+      color: var(--color-text);
+      background: var(--color-background);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    @media print {
+      .page { page-break-after: always; page-break-inside: avoid; }
+      .page:last-child { page-break-after: auto; }
+    }
+
+    @page { size: A4 portrait; margin: 15mm; }
+
+    .page {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      padding: 18mm 20mm;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ──────────────────────────────────────────────── */
+    .reading-header {
+      text-align: center;
+      margin-bottom: var(--space-xl);
+    }
+
+    .reading-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-2xl);
+      color: var(--color-primary);
+      margin-bottom: var(--space-xs);
+    }
+
+    .reading-header .subtitle {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+      font-style: italic;
+    }
+
+    /* ── Book Info Section ────────────────────────────────────── */
+    .book-info {
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: var(--space-md);
+      margin-bottom: var(--space-lg);
+      border-left: 4px solid var(--color-primary);
+    }
+
+    .info-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      margin-bottom: var(--space-md);
+    }
+
+    .info-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .info-label {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 700;
+      min-width: 100px;
+      flex-shrink: 0;
+    }
+
+    .info-input {
+      flex: 1;
+      border-bottom: 1px solid var(--color-border);
+      min-height: 22px;
+    }
+
+    .info-row-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-lg);
+      margin-bottom: var(--space-md);
+    }
+
+    .info-group {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    /* ── Progress Bar ────────────────────────────────────────── */
+    .progress-section {
+      margin-bottom: var(--space-lg);
+    }
+
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-sm);
+      font-weight: 700;
+      color: var(--color-primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-sm);
+      padding-bottom: var(--space-xs);
+      border-bottom: 1px solid var(--color-border-light);
+    }
+
+    .progress-track {
+      height: 20px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 10px;
+      position: relative;
+      margin-bottom: var(--space-xs);
+    }
+
+    .progress-markers {
+      display: flex;
+      justify-content: space-between;
+      font-size: 9px;
+      color: var(--color-text-muted);
+    }
+
+    .page-count-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: var(--space-sm);
+      font-size: var(--font-size-sm);
+    }
+
+    .page-count-row .page-input {
+      border-bottom: 1px solid var(--color-border);
+      min-width: 60px;
+      min-height: 18px;
+      display: inline-block;
+      text-align: center;
+    }
+
+    /* ── Star Rating ─────────────────────────────────────────── */
+    .rating-section {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      margin-bottom: var(--space-lg);
+      padding: var(--space-sm) var(--space-md);
+      background: var(--color-surface);
+      border-radius: 6px;
+    }
+
+    .rating-label {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-sm);
+      font-weight: 700;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .stars {
+      display: flex;
+      gap: var(--space-sm);
+    }
+
+    .star {
+      width: 28px;
+      height: 28px;
+      border: 2px solid var(--color-primary);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      opacity: 0.6;
+    }
+
+    /* ── Quotes Section ──────────────────────────────────────── */
+    .quotes-section {
+      margin-bottom: var(--space-lg);
+    }
+
+    .quote-slot {
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm) var(--space-md);
+      margin-bottom: var(--space-sm);
+      border-left: 3px solid var(--color-secondary);
+    }
+
+    .quote-number {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-2xl);
+      color: var(--color-primary);
+      opacity: 0.2;
+      float: left;
+      margin-right: var(--space-sm);
+      line-height: 1;
+    }
+
+    .quote-lines {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .quote-line {
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 20px;
+    }
+
+    .quote-page-ref {
+      text-align: right;
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      margin-top: var(--space-xs);
+    }
+
+    .quote-page-input {
+      border-bottom: 1px solid var(--color-border-light);
+      display: inline-block;
+      min-width: 40px;
+      min-height: 14px;
+    }
+
+    /* ── Review Section ──────────────────────────────────────── */
+    .review-section {
+      flex: 1;
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: var(--space-md);
+      margin-bottom: var(--space-md);
+    }
+
+    .review-lines {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .review-line {
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 22px;
+    }
+
+    /* ── Recommend Section ────────────────────────────────────── */
+    .recommend-section {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      background: var(--color-surface);
+      border-radius: 6px;
+      margin-bottom: var(--space-md);
+    }
+
+    .recommend-label {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .recommend-input {
+      flex: 1;
+      border-bottom: 1px solid var(--color-border);
+      min-height: 20px;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────── */
+    .page-footer {
+      margin-top: auto;
+      padding-top: var(--space-sm);
+      border-top: 1px solid var(--color-border-light);
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div class="page" data-page="{{pageNumber}}">
+    <!-- Header -->
+    <div class="reading-header">
+      <h1>{{title}}</h1>
+      <div class="subtitle">Capture your reading journey, one book at a time.</div>
+    </div>
+
+    <!-- Book Information -->
+    <div class="book-info">
+      <div class="info-row">
+        <span class="info-label">Book Title</span>
+        <div class="info-input"></div>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Author</span>
+        <div class="info-input"></div>
+      </div>
+      <div class="info-row-split">
+        <div class="info-group">
+          <span class="info-label">Start Date</span>
+          <div class="info-input"></div>
+        </div>
+        <div class="info-group">
+          <span class="info-label">Finish Date</span>
+          <div class="info-input"></div>
+        </div>
+      </div>
+      <div class="info-row-split">
+        <div class="info-group">
+          <span class="info-label">Genre</span>
+          <div class="info-input"></div>
+        </div>
+        <div class="info-group">
+          <span class="info-label">Pages</span>
+          <div class="info-input"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reading Progress -->
+    <div class="progress-section">
+      <div class="section-title">Reading Progress</div>
+      <div class="progress-track"></div>
+      <div class="progress-markers">
+        <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+      </div>
+      <div class="page-count-row">
+        <span>Pages read: <span class="page-input"></span></span>
+        <span>Pages remaining: <span class="page-input"></span></span>
+      </div>
+    </div>
+
+    <!-- Star Rating -->
+    <div class="rating-section">
+      <span class="rating-label">Rating</span>
+      <div class="stars">
+        <div class="star">1</div>
+        <div class="star">2</div>
+        <div class="star">3</div>
+        <div class="star">4</div>
+        <div class="star">5</div>
+      </div>
+    </div>
+
+    <!-- Favorite Quotes -->
+    <div class="quotes-section">
+      <div class="section-title">Favorite Quotes</div>
+      <div class="quote-slot">
+        <div class="quote-number">1</div>
+        <div class="quote-lines"><div class="quote-line"></div><div class="quote-line"></div></div>
+        <div class="quote-page-ref">p. <span class="quote-page-input"></span></div>
+      </div>
+      <div class="quote-slot">
+        <div class="quote-number">2</div>
+        <div class="quote-lines"><div class="quote-line"></div><div class="quote-line"></div></div>
+        <div class="quote-page-ref">p. <span class="quote-page-input"></span></div>
+      </div>
+      <div class="quote-slot">
+        <div class="quote-number">3</div>
+        <div class="quote-lines"><div class="quote-line"></div><div class="quote-line"></div></div>
+        <div class="quote-page-ref">p. <span class="quote-page-input"></span></div>
+      </div>
+    </div>
+
+    <!-- Review / Thoughts -->
+    <div class="review-section">
+      <div class="section-title">My Thoughts & Review</div>
+      <div class="review-lines">
+        <div class="review-line"></div>
+        <div class="review-line"></div>
+        <div class="review-line"></div>
+        <div class="review-line"></div>
+        <div class="review-line"></div>
+        <div class="review-line"></div>
+      </div>
+    </div>
+
+    <!-- Would Recommend To -->
+    <div class="recommend-section">
+      <span class="recommend-label">Would recommend to:</span>
+      <div class="recommend-input"></div>
+    </div>
+
+    <!-- Footer -->
+    <div class="page-footer">
+      <span>{{title}}</span>
+      <span>Page {{pageNumber}} of {{totalPages}}</span>
+    </div>
+  </div>
+</body>
+</html>

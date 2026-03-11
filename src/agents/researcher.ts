@@ -1,154 +1,56 @@
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { writeFile, mkdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
-import { randomUUID } from 'node:crypto';
-import type { AgentResult, Opportunity, CompetitionLevel } from '../types/index.js';
+import type { AgentResult, Opportunity } from '../types/index.js';
 import { loadConfig } from '../utils/config.js';
 import logger from '../utils/logger.js';
 import { logActivity } from '../tracker/activity-log.js';
+import { scrapeEtsyTrending } from '../research/etsy-scraper.js';
+import { scrapePinterestTrends } from '../research/pinterest-scraper.js';
+import { checkGoogleTrends } from '../research/trends-checker.js';
+import { buildOpportunities } from '../research/opportunity-builder.js';
+import { DEFAULT_CATEGORIES } from '../research/categories.js';
+import type { EtsyScrapedData, PinterestTrend, TrendData } from '../research/types.js';
 
 const STATE_DIR = resolve(process.cwd(), 'state');
 const QUEUE_DIR = join(STATE_DIR, 'queue');
-const NICHE_REGISTRY_PATH = resolve(process.cwd(), 'shared', 'niche-registry.md');
 
-const TRENDING_CATEGORIES = [
-  'planner-weekly',
-  'planner-monthly',
-  'tracker-habit',
-  'journal-gratitude',
-  'journal-daily',
-  'worksheet-budget',
-  'worksheet-goal',
-];
-
-interface EtsySearchResult {
-  title: string;
-  tags: string[];
-  price: number;
-  reviews: number;
-  favorites: number;
-  niche: string;
-  category: string;
-}
-
-async function loadExploredNiches(): Promise<Set<string>> {
-  const niches = new Set<string>();
-
+async function runEtsyScraper(categories: string[]): Promise<EtsyScrapedData[]> {
   try {
-    const content = await readFile(NICHE_REGISTRY_PATH, 'utf-8');
-    const lines = content.split('\n');
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed.startsWith('|') && !trimmed.startsWith('| Niche') && !trimmed.startsWith('|---')) {
-        const cells = trimmed.split('|').map((c: string) => c.trim()).filter(Boolean);
-        if (cells.length > 0 && cells[0] !== '') {
-          niches.add(cells[0]);
-        }
-      }
-    }
-  } catch {
-    logger.warn('Niche registry not found, treating all niches as unexplored');
+    logger.info('Starting Etsy scraper');
+    const results = await scrapeEtsyTrending(categories);
+    logger.info(`Etsy scraper returned ${results.length} results`);
+    return results;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`Etsy scraper failed: ${message}`);
+    return [];
   }
-
-  return niches;
 }
 
-async function searchEtsyTrending(category: string): Promise<EtsySearchResult[]> {
-  // Placeholder: in production, this would use EtsyClient to search the API
-  logger.info(`Searching Etsy trending for category: ${category}`);
-  return [];
+async function runPinterestScraper(keywords: string[]): Promise<PinterestTrend[]> {
+  try {
+    logger.info('Starting Pinterest scraper');
+    const results = await scrapePinterestTrends(keywords);
+    logger.info(`Pinterest scraper returned ${results.length} trends`);
+    return results;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`Pinterest scraper failed: ${message}`);
+    return [];
+  }
 }
 
-function analyzeCompetition(results: EtsySearchResult[]): {
-  competitionLevel: CompetitionLevel;
-  topSellerCount: number;
-} {
-  if (results.length === 0) {
-    return { competitionLevel: 'low', topSellerCount: 0 };
+async function runGoogleTrendsChecker(keywords: string[]): Promise<TrendData[]> {
+  try {
+    logger.info('Starting Google Trends checker');
+    const results = await checkGoogleTrends(keywords);
+    logger.info(`Google Trends checker returned ${results.length} results`);
+    return results;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`Google Trends checker failed: ${message}`);
+    return [];
   }
-
-  const avgReviews = results.reduce((sum, r) => sum + r.reviews, 0) / results.length;
-  const topSellerCount = results.filter((r) => r.reviews > 500).length;
-
-  let competitionLevel: CompetitionLevel = 'low';
-  if (avgReviews > 200 || topSellerCount > 3) {
-    competitionLevel = 'high';
-  } else if (avgReviews > 100 || topSellerCount > 1) {
-    competitionLevel = 'medium';
-  }
-
-  return { competitionLevel, topSellerCount };
-}
-
-function calculateTrendScore(results: EtsySearchResult[]): number {
-  if (results.length === 0) {
-    return 0;
-  }
-
-  const avgFavorites = results.reduce((sum, r) => sum + r.favorites, 0) / results.length;
-  const avgReviews = results.reduce((sum, r) => sum + r.reviews, 0) / results.length;
-
-  return Math.min(100, Math.round((avgFavorites * 0.3 + avgReviews * 0.7) / 5));
-}
-
-function extractKeywords(results: EtsySearchResult[]): string[] {
-  const tagCounts = new Map<string, number>();
-
-  for (const result of results) {
-    for (const tag of result.tags) {
-      const lower = tag.toLowerCase();
-      tagCounts.set(lower, (tagCounts.get(lower) ?? 0) + 1);
-    }
-  }
-
-  return Array.from(tagCounts.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 15)
-    .map(([tag]) => tag);
-}
-
-function buildOpportunity(
-  category: string,
-  niche: string,
-  results: EtsySearchResult[]
-): Opportunity {
-  const { competitionLevel } = analyzeCompetition(results);
-  const trendScore = calculateTrendScore(results);
-  const keywords = extractKeywords(results);
-  const avgPrice = results.length > 0
-    ? results.reduce((sum, r) => sum + r.price, 0) / results.length
-    : 0;
-  const reviewCount = results.length > 0
-    ? Math.round(results.reduce((sum, r) => sum + r.reviews, 0) / results.length)
-    : 0;
-
-  return {
-    id: randomUUID(),
-    niche,
-    avgPrice,
-    reviewCount,
-    competitionLevel,
-    trendScore,
-    keywords,
-    source: `etsy-trending:${category}`,
-    discoveredAt: new Date().toISOString(),
-  };
-}
-
-function filterByCriteria(
-  opportunity: Opportunity,
-  minReviewCount: number,
-  targetPriceRange: [number, number]
-): boolean {
-  if (opportunity.reviewCount < minReviewCount) {
-    return false;
-  }
-
-  if (opportunity.avgPrice < targetPriceRange[0] || opportunity.avgPrice > targetPriceRange[1]) {
-    return false;
-  }
-
-  return true;
 }
 
 export async function runResearch(): Promise<AgentResult<Opportunity[]>> {
@@ -158,50 +60,51 @@ export async function runResearch(): Promise<AgentResult<Opportunity[]>> {
 
   try {
     const config = await loadConfig();
-    const { maxOpportunitiesPerRun, minReviewCount, targetPriceRange } = config.agents.researcher;
+    const { maxOpportunitiesPerRun } = config.agents.researcher;
 
-    const exploredNiches = await loadExploredNiches();
-    logger.info(`Found ${exploredNiches.size} previously explored niches`);
+    // Run all three scrapers in parallel for speed.
+    // Each scraper handles its own errors internally and returns
+    // an empty array on failure (graceful degradation).
+    const [etsyData, pinterestData, trendsData] = await Promise.all([
+      runEtsyScraper(DEFAULT_CATEGORIES),
+      runPinterestScraper(DEFAULT_CATEGORIES),
+      runGoogleTrendsChecker(DEFAULT_CATEGORIES),
+    ]);
 
-    const allOpportunities: Opportunity[] = [];
+    const totalDataPoints = etsyData.length + pinterestData.length + trendsData.length;
+    logger.info(
+      `Research data collected: ${etsyData.length} Etsy, ` +
+      `${pinterestData.length} Pinterest, ${trendsData.length} Google Trends`
+    );
 
-    for (const category of TRENDING_CATEGORIES) {
-      const results = await searchEtsyTrending(category);
+    if (totalDataPoints === 0) {
+      logger.warn('All scrapers returned empty results — no opportunities to build');
 
-      if (results.length === 0) {
-        continue;
-      }
+      const duration = Math.round(performance.now() - startTime);
 
-      // Group results by niche
-      const nicheGroups = new Map<string, EtsySearchResult[]>();
-      for (const result of results) {
-        const niche = result.niche || category;
-        if (!nicheGroups.has(niche)) {
-          nicheGroups.set(niche, []);
-        }
-        nicheGroups.get(niche)!.push(result);
-      }
+      await logActivity({
+        timestamp: new Date().toISOString(),
+        agent: 'researcher',
+        action: 'research-complete',
+        details: 'All scrapers returned empty results',
+        duration,
+        success: true,
+      });
 
-      for (const [niche, nicheResults] of nicheGroups) {
-        if (exploredNiches.has(niche)) {
-          logger.info(`Skipping already-explored niche: ${niche}`);
-          continue;
-        }
-
-        const opportunity = buildOpportunity(category, niche, nicheResults);
-
-        if (filterByCriteria(opportunity, minReviewCount, targetPriceRange)) {
-          allOpportunities.push(opportunity);
-        }
-      }
+      return {
+        success: true,
+        data: [],
+        duration,
+      };
     }
 
-    // Sort by trend score descending, take top N
-    allOpportunities.sort((a, b) => b.trendScore - a.trendScore);
-    const selected = allOpportunities.slice(0, maxOpportunitiesPerRun);
+    // Build and score opportunities by cross-referencing all data sources
+    const opportunities = await buildOpportunities(etsyData, pinterestData, trendsData);
+    const selected = opportunities.slice(0, maxOpportunitiesPerRun);
 
-    // Write opportunities to queue
+    // Write opportunities to the queue directory
     await mkdir(QUEUE_DIR, { recursive: true });
+
     for (const opp of selected) {
       const filePath = join(QUEUE_DIR, `${opp.id}.json`);
       await writeFile(filePath, JSON.stringify(opp, null, 2), 'utf-8');
@@ -213,7 +116,11 @@ export async function runResearch(): Promise<AgentResult<Opportunity[]>> {
       timestamp: new Date().toISOString(),
       agent: 'researcher',
       action: 'research-complete',
-      details: `Found ${selected.length} opportunities from ${TRENDING_CATEGORIES.length} categories`,
+      details:
+        `Found ${selected.length} opportunities from ` +
+        `${DEFAULT_CATEGORIES.length} categories ` +
+        `(${etsyData.length} Etsy, ${pinterestData.length} Pinterest, ` +
+        `${trendsData.length} Google Trends data points)`,
       duration,
       success: true,
     });

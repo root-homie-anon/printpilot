@@ -12,7 +12,9 @@ import { runScoring } from './agents/scorer.js';
 import { aggregateMetrics } from './tracker/metrics.js';
 import { updateNicheRegistry } from './tracker/niche-updater.js';
 import { logActivity } from './tracker/activity-log.js';
-import type { ProductBrief } from './types/index.js';
+import { startBot, stopBot } from './notifications/telegram-bot.js';
+import { sendDailySummary } from './utils/notify.js';
+import type { ProductBrief, PipelineResult } from './types/index.js';
 
 const REQUIRED_ENV_VARS = [
   'ANTHROPIC_API_KEY',
@@ -97,6 +99,13 @@ async function runDailyPipeline(): Promise<void> {
   logger.info('=== Starting daily pipeline ===');
   const pipelineStart = performance.now();
 
+  const result: PipelineResult = {
+    productsProcessed: 0,
+    approved: 0,
+    listed: 0,
+    errors: [],
+  };
+
   await logActivity({
     timestamp: new Date().toISOString(),
     agent: 'orchestrator',
@@ -109,6 +118,8 @@ async function runDailyPipeline(): Promise<void> {
   const researchResult = await runResearch();
   if (!researchResult.success || !researchResult.data) {
     logger.error('Research stage failed, aborting pipeline');
+    result.errors.push('research: stage failed');
+    await sendDailySummary(result);
     return;
   }
   logger.info(`Research found ${researchResult.data.length} opportunities`);
@@ -118,6 +129,8 @@ async function runDailyPipeline(): Promise<void> {
   const strategyResult = await runStrategy();
   if (!strategyResult.success || !strategyResult.data) {
     logger.error('Strategy stage failed, aborting pipeline');
+    result.errors.push('strategy: stage failed');
+    await sendDailySummary(result);
     return;
   }
   const briefs: ProductBrief[] = strategyResult.data;
@@ -126,12 +139,14 @@ async function runDailyPipeline(): Promise<void> {
   // Stage 3-5: Design, Copy, Score (per product)
   for (const brief of briefs) {
     logger.info(`--- Processing product: ${brief.id} ---`);
+    result.productsProcessed++;
 
     // Design
     logger.info('Stage 3: Design');
     const designResult = await runDesign(brief);
     if (!designResult.success) {
       logger.error(`Design failed for ${brief.id}, skipping`);
+      result.errors.push(`${brief.id}: design failed`);
       continue;
     }
 
@@ -140,6 +155,7 @@ async function runDailyPipeline(): Promise<void> {
     const copyResult = await runCopywriting(brief.id);
     if (!copyResult.success) {
       logger.error(`Copywriting failed for ${brief.id}, skipping`);
+      result.errors.push(`${brief.id}: copywriting failed`);
       continue;
     }
 
@@ -148,6 +164,7 @@ async function runDailyPipeline(): Promise<void> {
     const scoreResult = await runScoring(brief.id);
     if (!scoreResult.success) {
       logger.error(`Scoring failed for ${brief.id}, skipping`);
+      result.errors.push(`${brief.id}: scoring failed`);
       continue;
     }
 
@@ -170,6 +187,9 @@ async function runDailyPipeline(): Promise<void> {
     duration: totalDuration,
     success: true,
   });
+
+  // Send daily summary via Telegram
+  await sendDailySummary(result);
 
   logger.info(`=== Daily pipeline complete: ${briefs.length} products in ${totalDuration}ms ===`);
 }
@@ -233,18 +253,35 @@ function setupCronSchedules(): void {
 function setupGracefulShutdown(): void {
   const shutdown = (signal: string): void => {
     logger.info(`Received ${signal}, shutting down gracefully...`);
-    logActivity({
-      timestamp: new Date().toISOString(),
-      agent: 'orchestrator',
-      action: `shutdown-${signal.toLowerCase()}`,
-      success: true,
-    }).finally(() => {
-      process.exit(0);
-    });
+
+    // Stop the Telegram bot
+    stopBot()
+      .then(() => {
+        return logActivity({
+          timestamp: new Date().toISOString(),
+          agent: 'orchestrator',
+          action: `shutdown-${signal.toLowerCase()}`,
+          success: true,
+        });
+      })
+      .finally(() => {
+        process.exit(0);
+      });
   };
 
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
+}
+
+async function startTelegramBot(): Promise<void> {
+  try {
+    await startBot();
+    logger.info('Telegram bot is running');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`Failed to start Telegram bot: ${message}`);
+    // Don't crash — the bot is optional
+  }
 }
 
 async function main(): Promise<void> {
@@ -266,7 +303,9 @@ async function main(): Promise<void> {
 
   switch (mode) {
     case 'daily':
+      await startTelegramBot();
       await runDailyPipeline();
+      await stopBot();
       break;
 
     case 'weekly':
@@ -284,7 +323,8 @@ async function main(): Promise<void> {
     }
 
     case 'default':
-      logger.info('Starting in default mode: dashboard + cron schedules');
+      logger.info('Starting in default mode: dashboard + cron schedules + Telegram bot');
+      await startTelegramBot();
       await startDashboard();
       setupCronSchedules();
       logger.info('PrintPilot is running. Press Ctrl+C to stop.');

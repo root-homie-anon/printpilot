@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}} — Fitness Tracker</title>
+  <style>
+    {{designSystemCss}}
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      font-family: var(--font-body);
+      font-size: var(--font-size-base);
+      color: var(--color-text);
+      background: var(--color-background);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    @media print {
+      .page { page-break-after: always; page-break-inside: avoid; }
+      .page:last-child { page-break-after: auto; }
+    }
+
+    @page { size: A4 portrait; margin: 15mm; }
+
+    .page {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      padding: 15mm;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ──────────────────────────────────────────────── */
+    .fitness-header {
+      text-align: center;
+      margin-bottom: var(--space-lg);
+      padding-bottom: var(--space-md);
+      border-bottom: 3px solid var(--color-primary);
+    }
+
+    .fitness-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-2xl);
+      color: var(--color-primary);
+    }
+
+    .fitness-header .date-range {
+      font-size: var(--font-size-lg);
+      color: var(--color-text-muted);
+      font-style: italic;
+      margin-top: var(--space-xs);
+    }
+
+    /* ── Section Title ───────────────────────────────────────── */
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-sm);
+      font-weight: 700;
+      color: var(--color-background);
+      background: var(--color-primary);
+      padding: var(--space-xs) var(--space-sm);
+      border-radius: 4px;
+      margin-bottom: var(--space-sm);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .section-title.cardio {
+      background: var(--color-secondary);
+    }
+
+    .section-title.measurements {
+      background: #6B7280;
+    }
+
+    /* ── Tables ──────────────────────────────────────────────── */
+    .fitness-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: var(--space-lg);
+      font-size: var(--font-size-sm);
+    }
+
+    .fitness-table th {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      padding: var(--space-xs) var(--space-sm);
+      text-align: center;
+      color: var(--color-text-muted);
+      border-bottom: 2px solid var(--color-border);
+      font-weight: 700;
+    }
+
+    .fitness-table th:first-child {
+      text-align: left;
+    }
+
+    .fitness-table td {
+      padding: 5px var(--space-sm);
+      border-bottom: 1px solid var(--color-border-light);
+      text-align: center;
+      min-height: 24px;
+    }
+
+    .fitness-table td:first-child {
+      text-align: left;
+    }
+
+    .fitness-table tr:nth-child(even) {
+      background: var(--color-surface);
+    }
+
+    /* ── Two Column Layout ───────────────────────────────────── */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-md);
+      margin-bottom: var(--space-lg);
+    }
+
+    /* ── Measurements Section ────────────────────────────────── */
+    .measurements-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-sm);
+    }
+
+    .measurement-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-xs) 0;
+      border-bottom: 1px solid var(--color-border-light);
+    }
+
+    .measurement-label {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      font-weight: 600;
+    }
+
+    .measurement-value {
+      border-bottom: 1px solid var(--color-border);
+      min-width: 60px;
+      min-height: 18px;
+      text-align: center;
+    }
+
+    /* ── Water / Protein Grid ────────────────────────────────── */
+    .intake-section {
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm);
+    }
+
+    .intake-grid {
+      display: grid;
+      grid-template-columns: auto repeat(7, 1fr);
+      gap: 2px;
+      font-size: var(--font-size-xs);
+    }
+
+    .intake-header {
+      font-weight: 700;
+      color: var(--color-text-muted);
+      text-align: center;
+      padding: 3px;
+      font-size: 9px;
+      text-transform: uppercase;
+    }
+
+    .intake-label {
+      font-weight: 600;
+      color: var(--color-text);
+      padding: 3px;
+      font-size: var(--font-size-xs);
+    }
+
+    .intake-cell {
+      border: 1px solid var(--color-border-light);
+      border-radius: 3px;
+      min-height: 20px;
+      text-align: center;
+    }
+
+    /* ── Notes ────────────────────────────────────────────────── */
+    .notes-section {
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm);
+    }
+
+    .notes-title {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-sm);
+      font-weight: 700;
+      color: var(--color-primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-sm);
+    }
+
+    .note-line {
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 20px;
+      margin-bottom: 6px;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────── */
+    .page-footer {
+      margin-top: auto;
+      padding-top: var(--space-sm);
+      border-top: 1px solid var(--color-border-light);
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div class="page" data-page="{{pageNumber}}">
+    <!-- Header -->
+    <div class="fitness-header">
+      <h1>{{title}}</h1>
+      <div class="date-range">Week of _____ / _____ / _____ to _____ / _____ / _____</div>
+    </div>
+
+    <!-- Exercise Log -->
+    <div class="section-title">Strength Training Log</div>
+    <table class="fitness-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Exercise</th>
+          <th>Sets</th>
+          <th>Reps</th>
+          <th>Weight / Duration</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+
+    <!-- Cardio Section -->
+    <div class="section-title cardio">Cardio Log</div>
+    <table class="fitness-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Type</th>
+          <th>Duration</th>
+          <th>Distance</th>
+          <th>Calories</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+
+    <!-- Two Column: Measurements + Intake -->
+    <div class="two-col">
+      <!-- Body Measurements -->
+      <div>
+        <div class="section-title measurements">Weekly Body Measurements</div>
+        <div class="measurements-grid">
+          <div class="measurement-item"><span class="measurement-label">Weight</span><div class="measurement-value"></div></div>
+          <div class="measurement-item"><span class="measurement-label">Body Fat %</span><div class="measurement-value"></div></div>
+          <div class="measurement-item"><span class="measurement-label">Chest</span><div class="measurement-value"></div></div>
+          <div class="measurement-item"><span class="measurement-label">Waist</span><div class="measurement-value"></div></div>
+          <div class="measurement-item"><span class="measurement-label">Hips</span><div class="measurement-value"></div></div>
+          <div class="measurement-item"><span class="measurement-label">Arms</span><div class="measurement-value"></div></div>
+          <div class="measurement-item"><span class="measurement-label">Thighs</span><div class="measurement-value"></div></div>
+          <div class="measurement-item"><span class="measurement-label">Calves</span><div class="measurement-value"></div></div>
+        </div>
+      </div>
+
+      <!-- Water / Protein Intake -->
+      <div class="intake-section">
+        <div class="notes-title">Daily Intake</div>
+        <div class="intake-grid">
+          <div class="intake-header"></div>
+          <div class="intake-header">Mon</div>
+          <div class="intake-header">Tue</div>
+          <div class="intake-header">Wed</div>
+          <div class="intake-header">Thu</div>
+          <div class="intake-header">Fri</div>
+          <div class="intake-header">Sat</div>
+          <div class="intake-header">Sun</div>
+
+          <div class="intake-label">Water (cups)</div>
+          <div class="intake-cell"></div><div class="intake-cell"></div><div class="intake-cell"></div>
+          <div class="intake-cell"></div><div class="intake-cell"></div><div class="intake-cell"></div>
+          <div class="intake-cell"></div>
+
+          <div class="intake-label">Protein (g)</div>
+          <div class="intake-cell"></div><div class="intake-cell"></div><div class="intake-cell"></div>
+          <div class="intake-cell"></div><div class="intake-cell"></div><div class="intake-cell"></div>
+          <div class="intake-cell"></div>
+
+          <div class="intake-label">Calories</div>
+          <div class="intake-cell"></div><div class="intake-cell"></div><div class="intake-cell"></div>
+          <div class="intake-cell"></div><div class="intake-cell"></div><div class="intake-cell"></div>
+          <div class="intake-cell"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Weekly Progress Notes -->
+    <div class="notes-section">
+      <div class="notes-title">Weekly Progress Notes</div>
+      <div class="note-line"></div>
+      <div class="note-line"></div>
+      <div class="note-line"></div>
+    </div>
+
+    <!-- Footer -->
+    <div class="page-footer">
+      <span>{{title}}</span>
+      <span>Page {{pageNumber}} of {{totalPages}}</span>
+    </div>
+  </div>
+</body>
+</html>

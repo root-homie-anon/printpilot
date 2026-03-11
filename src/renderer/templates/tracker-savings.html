@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}} — Savings Tracker</title>
+  <style>
+    {{designSystemCss}}
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      font-family: var(--font-body);
+      font-size: var(--font-size-base);
+      color: var(--color-text);
+      background: var(--color-background);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    @media print {
+      .page { page-break-after: always; page-break-inside: avoid; }
+      .page:last-child { page-break-after: auto; }
+    }
+
+    @page { size: A4 portrait; margin: 15mm; }
+
+    .page {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      padding: 15mm;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ──────────────────────────────────────────────── */
+    .savings-header {
+      text-align: center;
+      margin-bottom: var(--space-lg);
+      padding-bottom: var(--space-md);
+      border-bottom: 3px solid var(--color-primary);
+    }
+
+    .savings-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-2xl);
+      color: var(--color-primary);
+    }
+
+    .goal-info {
+      display: flex;
+      justify-content: center;
+      gap: var(--space-xl);
+      margin-top: var(--space-sm);
+    }
+
+    .goal-field {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .goal-label {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+      font-weight: 600;
+    }
+
+    .goal-input {
+      border-bottom: 2px solid var(--color-primary);
+      min-width: 120px;
+      min-height: 24px;
+    }
+
+    /* ── Section Title ───────────────────────────────────────── */
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-sm);
+      font-weight: 700;
+      color: var(--color-primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-sm);
+      padding-bottom: var(--space-xs);
+      border-bottom: 1px solid var(--color-border-light);
+    }
+
+    /* ── Savings Thermometer ─────────────────────────────────── */
+    .thermometer-section {
+      margin-bottom: var(--space-lg);
+      padding: var(--space-md);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      background: var(--color-surface);
+    }
+
+    .thermometer-track {
+      height: 32px;
+      background: var(--color-background);
+      border: 2px solid var(--color-primary);
+      border-radius: 16px;
+      position: relative;
+      margin-bottom: var(--space-xs);
+    }
+
+    .thermometer-markers {
+      display: flex;
+      justify-content: space-between;
+      padding: 0 4px;
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+    }
+
+    .milestone-checkpoints {
+      display: flex;
+      justify-content: space-between;
+      margin-top: var(--space-md);
+      padding: 0 2%;
+    }
+
+    .checkpoint {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+
+    .checkpoint-circle {
+      width: 28px;
+      height: 28px;
+      border: 2px solid var(--color-primary);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--font-size-xs);
+      font-weight: 700;
+      color: var(--color-primary);
+    }
+
+    .checkpoint-label {
+      font-size: 9px;
+      color: var(--color-text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    /* ── Weekly Savings Log ───────────────────────────────────── */
+    .savings-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: var(--space-lg);
+      font-size: var(--font-size-sm);
+    }
+
+    .savings-table th {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      padding: var(--space-xs) var(--space-sm);
+      text-align: left;
+      color: var(--color-text-muted);
+      border-bottom: 2px solid var(--color-border);
+      font-weight: 700;
+    }
+
+    .savings-table th:nth-child(2),
+    .savings-table th:nth-child(3) {
+      text-align: right;
+    }
+
+    .savings-table td {
+      padding: 5px var(--space-sm);
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 24px;
+    }
+
+    .savings-table td:nth-child(2),
+    .savings-table td:nth-child(3) {
+      text-align: right;
+    }
+
+    .savings-table tr:nth-child(even) {
+      background: var(--color-surface);
+    }
+
+    /* ── Two Column Layout ───────────────────────────────────── */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-md);
+      margin-bottom: var(--space-lg);
+    }
+
+    /* ── Monthly Summary ─────────────────────────────────────── */
+    .summary-section {
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm);
+    }
+
+    .summary-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-xs) 0;
+      border-bottom: 1px solid var(--color-border-light);
+    }
+
+    .summary-label {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      font-weight: 600;
+    }
+
+    .summary-value {
+      border-bottom: 1px solid var(--color-border);
+      min-width: 80px;
+      min-height: 18px;
+      text-align: right;
+    }
+
+    .summary-item.total {
+      border-top: 2px solid var(--color-primary);
+      border-bottom: none;
+      padding-top: var(--space-sm);
+      margin-top: var(--space-xs);
+    }
+
+    .summary-item.total .summary-label {
+      font-weight: 700;
+      color: var(--color-primary);
+      font-size: var(--font-size-sm);
+    }
+
+    /* ── Expense Categories ──────────────────────────────────── */
+    .expense-section {
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm);
+    }
+
+    .pie-placeholder {
+      width: 100px;
+      height: 100px;
+      border: 2px dashed var(--color-border);
+      border-radius: 50%;
+      margin: 0 auto var(--space-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .pie-hint {
+      font-size: 8px;
+      color: var(--color-border);
+      text-align: center;
+    }
+
+    .expense-legend {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+
+    .expense-legend-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      font-size: var(--font-size-xs);
+    }
+
+    .expense-color {
+      width: 10px;
+      height: 10px;
+      border: 1px solid var(--color-border);
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    .expense-name {
+      flex: 1;
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 14px;
+    }
+
+    .expense-amount {
+      border-bottom: 1px solid var(--color-border-light);
+      min-width: 50px;
+      min-height: 14px;
+      text-align: right;
+    }
+
+    /* ── Tips / Motivation ───────────────────────────────────── */
+    .tips-section {
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm);
+      border-left: 4px solid var(--color-secondary);
+    }
+
+    .note-line {
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 18px;
+      margin-bottom: 6px;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────── */
+    .page-footer {
+      margin-top: auto;
+      padding-top: var(--space-sm);
+      border-top: 1px solid var(--color-border-light);
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div class="page" data-page="{{pageNumber}}">
+    <!-- Header -->
+    <div class="savings-header">
+      <h1>{{title}}</h1>
+      <div class="goal-info">
+        <div class="goal-field">
+          <span class="goal-label">Goal:</span>
+          <div class="goal-input"></div>
+        </div>
+        <div class="goal-field">
+          <span class="goal-label">Target:</span>
+          <div class="goal-input" style="min-width: 90px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Savings Thermometer / Progress Bar -->
+    <div class="thermometer-section">
+      <div class="section-title">Savings Progress</div>
+      <div class="thermometer-track"></div>
+      <div class="thermometer-markers">
+        <span>$0</span><span>25%</span><span>50%</span><span>75%</span><span>Target</span>
+      </div>
+      <div class="milestone-checkpoints">
+        <div class="checkpoint">
+          <div class="checkpoint-circle">25</div>
+          <span class="checkpoint-label">Quarter</span>
+        </div>
+        <div class="checkpoint">
+          <div class="checkpoint-circle">50</div>
+          <span class="checkpoint-label">Halfway</span>
+        </div>
+        <div class="checkpoint">
+          <div class="checkpoint-circle">75</div>
+          <span class="checkpoint-label">Almost</span>
+        </div>
+        <div class="checkpoint">
+          <div class="checkpoint-circle">100</div>
+          <span class="checkpoint-label">Goal!</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Weekly Savings Log -->
+    <div class="section-title">Weekly Savings Log</div>
+    <table class="savings-table">
+      <thead>
+        <tr>
+          <th style="width: 30%;">Date / Week</th>
+          <th style="width: 35%;">Amount Saved</th>
+          <th style="width: 35%;">Running Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+
+    <!-- Two Column: Summary + Expenses -->
+    <div class="two-col">
+      <!-- Monthly Summary -->
+      <div class="summary-section">
+        <div class="section-title">Monthly Summary</div>
+        <div class="summary-item">
+          <span class="summary-label">Total income</span>
+          <div class="summary-value"></div>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Total expenses</span>
+          <div class="summary-value"></div>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Amount saved</span>
+          <div class="summary-value"></div>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Savings rate (%)</span>
+          <div class="summary-value"></div>
+        </div>
+        <div class="summary-item total">
+          <span class="summary-label">Total saved to date</span>
+          <div class="summary-value"></div>
+        </div>
+      </div>
+
+      <!-- Expense Categories -->
+      <div class="expense-section">
+        <div class="section-title">Expense Breakdown</div>
+        <div class="pie-placeholder">
+          <span class="pie-hint">chart</span>
+        </div>
+        <div class="expense-legend">
+          <div class="expense-legend-item"><div class="expense-color"></div><div class="expense-name"></div><div class="expense-amount"></div></div>
+          <div class="expense-legend-item"><div class="expense-color"></div><div class="expense-name"></div><div class="expense-amount"></div></div>
+          <div class="expense-legend-item"><div class="expense-color"></div><div class="expense-name"></div><div class="expense-amount"></div></div>
+          <div class="expense-legend-item"><div class="expense-color"></div><div class="expense-name"></div><div class="expense-amount"></div></div>
+          <div class="expense-legend-item"><div class="expense-color"></div><div class="expense-name"></div><div class="expense-amount"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tips / Motivation -->
+    <div class="tips-section">
+      <div class="section-title">Tips & Motivation</div>
+      <div class="note-line"></div>
+      <div class="note-line"></div>
+      <div class="note-line"></div>
+    </div>
+
+    <!-- Footer -->
+    <div class="page-footer">
+      <span>{{title}}</span>
+      <span>Page {{pageNumber}} of {{totalPages}}</span>
+    </div>
+  </div>
+</body>
+</html>

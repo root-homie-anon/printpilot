@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}} — Study Planner</title>
+  <style>
+    {{designSystemCss}}
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      font-family: var(--font-body);
+      font-size: var(--font-size-base);
+      color: var(--color-text);
+      background: var(--color-background);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    @media print {
+      .page { page-break-after: always; page-break-inside: avoid; }
+      .page:last-child { page-break-after: auto; }
+    }
+
+    @page { size: A4 portrait; margin: 15mm; }
+
+    .page {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      padding: 15mm;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ──────────────────────────────────────────────── */
+    .study-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: var(--space-lg);
+      padding-bottom: var(--space-md);
+      border-bottom: 3px solid var(--color-primary);
+    }
+
+    .study-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-2xl);
+      color: var(--color-primary);
+    }
+
+    .subject-field {
+      text-align: right;
+    }
+
+    .subject-label {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+
+    .subject-input {
+      border-bottom: 2px solid var(--color-primary);
+      min-width: 160px;
+      min-height: 24px;
+      margin-top: 2px;
+    }
+
+    /* ── Section Title ───────────────────────────────────────── */
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-xs);
+      font-weight: 700;
+      color: var(--color-primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-sm);
+      padding-bottom: var(--space-xs);
+      border-bottom: 1px solid var(--color-border-light);
+    }
+
+    .section-title-bar {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-xs);
+      font-weight: 700;
+      color: var(--color-background);
+      background: var(--color-primary);
+      padding: var(--space-xs) var(--space-sm);
+      border-radius: 4px;
+      margin-bottom: var(--space-sm);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .section-title-bar.secondary {
+      background: var(--color-secondary);
+    }
+
+    /* ── Study Schedule Grid ─────────────────────────────────── */
+    .schedule-grid {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: var(--space-md);
+      font-size: var(--font-size-xs);
+    }
+
+    .schedule-grid th {
+      font-family: var(--font-heading);
+      font-size: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      padding: 4px 3px;
+      text-align: center;
+      color: var(--color-primary);
+      border-bottom: 2px solid var(--color-primary);
+      font-weight: 700;
+    }
+
+    .schedule-grid th.time-col {
+      color: var(--color-text-muted);
+      text-align: left;
+      width: 56px;
+    }
+
+    .schedule-grid td {
+      border: 1px solid var(--color-border-light);
+      padding: 3px;
+      min-height: 24px;
+      text-align: center;
+    }
+
+    .schedule-grid td.time-label {
+      font-weight: 600;
+      font-size: 9px;
+      color: var(--color-text-muted);
+      text-align: left;
+      border-left: none;
+    }
+
+    .schedule-grid tr:nth-child(even) td:not(.time-label) {
+      background: var(--color-surface);
+    }
+
+    /* ── Assignment Tracker ──────────────────────────────────── */
+    .assignment-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: var(--space-md);
+      font-size: var(--font-size-xs);
+    }
+
+    .assignment-table th {
+      font-family: var(--font-heading);
+      font-size: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      padding: var(--space-xs) var(--space-sm);
+      text-align: left;
+      color: var(--color-text-muted);
+      border-bottom: 2px solid var(--color-border);
+      font-weight: 700;
+    }
+
+    .assignment-table td {
+      padding: 4px var(--space-sm);
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 22px;
+    }
+
+    .assignment-table tr:nth-child(even) {
+      background: var(--color-surface);
+    }
+
+    .priority-dot {
+      width: 10px;
+      height: 10px;
+      border: 1.5px solid var(--color-border);
+      border-radius: 50%;
+      margin: 0 auto;
+    }
+
+    /* ── Two Column Layout ───────────────────────────────────── */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-md);
+      margin-bottom: var(--space-md);
+    }
+
+    /* ── Exam Countdown ──────────────────────────────────────── */
+    .countdown-section {
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm);
+      border-left: 4px solid #dc3545;
+    }
+
+    .countdown-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-sm);
+      padding-bottom: var(--space-xs);
+      border-bottom: 1px solid var(--color-border-light);
+    }
+
+    .countdown-exam {
+      flex: 1;
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 16px;
+      margin-right: var(--space-sm);
+    }
+
+    .countdown-days {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-xs);
+      color: #dc3545;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .countdown-days-input {
+      border-bottom: 1px solid var(--color-border);
+      display: inline-block;
+      min-width: 24px;
+      min-height: 14px;
+      text-align: center;
+    }
+
+    /* ── Key Concepts ────────────────────────────────────────── */
+    .concepts-section {
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm);
+    }
+
+    .concept-line {
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 18px;
+      margin-bottom: 6px;
+    }
+
+    /* ── Study Session Log ───────────────────────────────────── */
+    .session-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: var(--font-size-xs);
+    }
+
+    .session-table th {
+      font-family: var(--font-heading);
+      font-size: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      padding: var(--space-xs) var(--space-sm);
+      text-align: left;
+      color: var(--color-text-muted);
+      border-bottom: 2px solid var(--color-border);
+      font-weight: 700;
+    }
+
+    .session-table td {
+      padding: 4px var(--space-sm);
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 20px;
+    }
+
+    .session-table tr:nth-child(even) {
+      background: var(--color-surface);
+    }
+
+    .rating-circles {
+      display: flex;
+      gap: 3px;
+      justify-content: center;
+    }
+
+    .rating-circle {
+      width: 10px;
+      height: 10px;
+      border: 1px solid var(--color-border);
+      border-radius: 50%;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────── */
+    .page-footer {
+      margin-top: auto;
+      padding-top: var(--space-sm);
+      border-top: 1px solid var(--color-border-light);
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div class="page" data-page="{{pageNumber}}">
+    <!-- Header -->
+    <div class="study-header">
+      <h1>{{title}}</h1>
+      <div class="subject-field">
+        <div class="subject-label">Subject / Course</div>
+        <div class="subject-input"></div>
+      </div>
+    </div>
+
+    <!-- Study Schedule Grid -->
+    <div class="section-title-bar">Study Schedule</div>
+    <table class="schedule-grid">
+      <thead>
+        <tr>
+          <th class="time-col">Time</th>
+          <th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="time-label">8-10 AM</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td class="time-label">10-12 PM</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td class="time-label">12-2 PM</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td class="time-label">2-4 PM</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td class="time-label">4-6 PM</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td class="time-label">6-8 PM</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+
+    <!-- Assignment Tracker -->
+    <div class="section-title-bar secondary">Assignment Tracker</div>
+    <table class="assignment-table">
+      <thead>
+        <tr>
+          <th style="width: 35%;">Assignment</th>
+          <th style="width: 20%;">Due Date</th>
+          <th style="width: 15%; text-align: center;">Priority</th>
+          <th style="width: 30%;">Status / Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td></td><td></td><td><div class="priority-dot"></div></td><td></td></tr>
+        <tr><td></td><td></td><td><div class="priority-dot"></div></td><td></td></tr>
+        <tr><td></td><td></td><td><div class="priority-dot"></div></td><td></td></tr>
+        <tr><td></td><td></td><td><div class="priority-dot"></div></td><td></td></tr>
+        <tr><td></td><td></td><td><div class="priority-dot"></div></td><td></td></tr>
+      </tbody>
+    </table>
+
+    <!-- Two Column: Exam Countdown + Key Concepts -->
+    <div class="two-col">
+      <!-- Exam Countdown -->
+      <div class="countdown-section">
+        <div class="section-title">Exam Countdown</div>
+        <div class="countdown-item">
+          <div class="countdown-exam"></div>
+          <span class="countdown-days"><span class="countdown-days-input"></span> days</span>
+        </div>
+        <div class="countdown-item">
+          <div class="countdown-exam"></div>
+          <span class="countdown-days"><span class="countdown-days-input"></span> days</span>
+        </div>
+        <div class="countdown-item">
+          <div class="countdown-exam"></div>
+          <span class="countdown-days"><span class="countdown-days-input"></span> days</span>
+        </div>
+      </div>
+
+      <!-- Key Concepts / Formulas -->
+      <div class="concepts-section">
+        <div class="section-title">Key Concepts & Formulas</div>
+        <div class="concept-line"></div>
+        <div class="concept-line"></div>
+        <div class="concept-line"></div>
+        <div class="concept-line"></div>
+        <div class="concept-line"></div>
+        <div class="concept-line"></div>
+        <div class="concept-line"></div>
+      </div>
+    </div>
+
+    <!-- Study Session Log -->
+    <div class="section-title">Study Session Log</div>
+    <table class="session-table">
+      <thead>
+        <tr>
+          <th style="width: 15%;">Date</th>
+          <th style="width: 15%;">Duration</th>
+          <th style="width: 40%;">Topics Covered</th>
+          <th style="width: 30%; text-align: center;">Productivity</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td></td><td></td><td></td><td><div class="rating-circles"><div class="rating-circle"></div><div class="rating-circle"></div><div class="rating-circle"></div><div class="rating-circle"></div><div class="rating-circle"></div></div></td></tr>
+        <tr><td></td><td></td><td></td><td><div class="rating-circles"><div class="rating-circle"></div><div class="rating-circle"></div><div class="rating-circle"></div><div class="rating-circle"></div><div class="rating-circle"></div></div></td></tr>
+        <tr><td></td><td></td><td></td><td><div class="rating-circles"><div class="rating-circle"></div><div class="rating-circle"></div><div class="rating-circle"></div><div class="rating-circle"></div><div class="rating-circle"></div></div></td></tr>
+        <tr><td></td><td></td><td></td><td><div class="rating-circles"><div class="rating-circle"></div><div class="rating-circle"></div><div class="rating-circle"></div><div class="rating-circle"></div><div class="rating-circle"></div></div></td></tr>
+        <tr><td></td><td></td><td></td><td><div class="rating-circles"><div class="rating-circle"></div><div class="rating-circle"></div><div class="rating-circle"></div><div class="rating-circle"></div><div class="rating-circle"></div></div></td></tr>
+      </tbody>
+    </table>
+
+    <!-- Footer -->
+    <div class="page-footer">
+      <span>{{title}}</span>
+      <span>Page {{pageNumber}} of {{totalPages}}</span>
+    </div>
+  </div>
+</body>
+</html>

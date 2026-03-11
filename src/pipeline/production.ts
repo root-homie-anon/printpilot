@@ -6,18 +6,17 @@ import type {
   ProductBrief,
   Product,
   ListingData,
+  PipelineResult,
 } from '../types/index.js';
 import { runAgent } from '../agents/runner.js';
-import { checkApproval, createPendingApproval } from './approval-gate.js';
+import { createPendingApproval, waitForApproval } from './approval-gate.js';
 import { loadConfig } from '../utils/config.js';
+import {
+  sendPipelineError,
+  sendDailySummary,
+  sendListingLive,
+} from '../utils/notify.js';
 import logger from '../utils/logger.js';
-
-export interface PipelineResult {
-  productsProcessed: number;
-  approved: number;
-  listed: number;
-  errors: string[];
-}
 
 const STATE_BASE = resolve(process.cwd(), 'state');
 const QUEUE_DIR = resolve(STATE_BASE, 'products');
@@ -46,14 +45,6 @@ async function readProductState<T>(
     return JSON.parse(raw) as T;
   } catch {
     return null;
-  }
-}
-
-async function sendNotification(message: string): Promise<void> {
-  const config = await loadConfig();
-  if (config.notifications.channel === 'telegram') {
-    logger.info(`[Telegram notification] ${message}`);
-    // Telegram integration would fire here
   }
 }
 
@@ -88,7 +79,8 @@ export async function runProductionPipeline(): Promise<PipelineResult> {
     const message = error instanceof Error ? error.message : String(error);
     logger.error(`Research stage failed: ${message}`);
     result.errors.push(`research: ${message}`);
-    await sendNotification(`Production pipeline: research stage failed - ${message}`);
+    await sendPipelineError('research', message);
+    await sendDailySummary(result);
     return result;
   }
 
@@ -111,7 +103,8 @@ export async function runProductionPipeline(): Promise<PipelineResult> {
     const message = error instanceof Error ? error.message : String(error);
     logger.error(`Strategy stage failed: ${message}`);
     result.errors.push(`strategy: ${message}`);
-    await sendNotification(`Production pipeline: strategy stage failed - ${message}`);
+    await sendPipelineError('strategy', message);
+    await sendDailySummary(result);
     return result;
   }
 
@@ -170,59 +163,60 @@ export async function runProductionPipeline(): Promise<PipelineResult> {
 
       // ── Stage 6: Approval Gate ────────────────────────────
       logger.info(`Stage 6: Approval gate for product ${productId}`);
+      // createPendingApproval now automatically triggers Telegram notification
       await createPendingApproval(productId);
 
       if (config.notifications.approvalRequired) {
-        await sendNotification(
-          `New product ready for review: ${productId}\n` +
-          `Niche: ${brief.niche}\n` +
-          `Score: ${scoreResult.data.overallScore}\n` +
-          `Recommendation: ${scoreResult.data.recommendation}`
-        );
-      }
+        // Wait for user decision via Telegram (or dashboard)
+        const approvalDecision = await waitForApproval(productId);
 
-      const approvalStatus = await checkApproval(productId);
+        if (approvalDecision.decision === 'approve') {
+          result.approved++;
 
-      if (approvalStatus === 'approved') {
-        result.approved++;
+          // ── Stage 7: Listing ──────────────────────────────
+          if (config.features.autoPublish) {
+            logger.info(`Stage 7: Running listing agent for product ${productId}`);
+            const listingResult = await runAgent<ListingData>('listing-agent', {
+              productId,
+              copy: copyResult.data,
+              pdfPath: designResult.data.pdfPath,
+            });
 
-        // ── Stage 7: Listing ──────────────────────────────
-        if (config.features.autoPublish) {
-          logger.info(`Stage 7: Running listing agent for product ${productId}`);
-          const listingResult = await runAgent<ListingData>('listing-agent', {
-            productId,
-            copy: copyResult.data,
-            pdfPath: designResult.data.pdfPath,
-          });
+            if (!listingResult.success || !listingResult.data) {
+              throw new Error(listingResult.error ?? 'Listing agent returned no data');
+            }
 
-          if (!listingResult.success || !listingResult.data) {
-            throw new Error(listingResult.error ?? 'Listing agent returned no data');
+            await writeProductState(productId, 'listing', listingResult.data);
+            result.listed++;
+
+            // Send listing live notification
+            await sendListingLive(listingResult.data);
+
+            logger.info(
+              `Product ${productId} listed at ${listingResult.data.etsyUrl}`
+            );
+          } else {
+            logger.info(
+              `Product ${productId} approved but autoPublish is disabled`
+            );
           }
-
-          await writeProductState(productId, 'listing', listingResult.data);
-          result.listed++;
-
-          logger.info(
-            `Product ${productId} listed at ${listingResult.data.etsyUrl}`
-          );
         } else {
           logger.info(
-            `Product ${productId} approved but autoPublish is disabled`
+            `Product ${productId} ${approvalDecision.decision}ed` +
+            (approvalDecision.feedback ? `: ${approvalDecision.feedback}` : '')
           );
         }
       } else {
-        logger.info(
-          `Product ${productId} awaiting approval (status: ${approvalStatus})`
-        );
+        // No approval required — auto-approve
+        result.approved++;
+        logger.info(`Product ${productId} auto-approved (approval not required)`);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logger.error(`Product ${productId} pipeline failed: ${message}`);
       result.errors.push(`${productId}: ${message}`);
 
-      await sendNotification(
-        `Product pipeline failed for ${productId}: ${message}`
-      );
+      await sendPipelineError('product-pipeline', message, productId);
     }
   }
 
@@ -232,7 +226,11 @@ export async function runProductionPipeline(): Promise<PipelineResult> {
     `${result.errors.length} errors ===`
   );
 
+  // Send daily summary
+  await sendDailySummary(result);
+
   return result;
 }
 
+export type { PipelineResult };
 export default runProductionPipeline;

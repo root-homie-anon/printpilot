@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}} — Monthly Planner</title>
+  <style>
+    {{designSystemCss}}
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      font-family: var(--font-body);
+      font-size: var(--font-size-base);
+      color: var(--color-text);
+      background: var(--color-background);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    @media print {
+      .page { page-break-after: always; page-break-inside: avoid; }
+      .page:last-child { page-break-after: auto; }
+    }
+
+    @page { size: A4 portrait; margin: 15mm; }
+
+    .page {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      padding: 15mm;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ──────────────────────────────────────────────── */
+    .monthly-header {
+      text-align: center;
+      margin-bottom: var(--space-lg);
+      padding-bottom: var(--space-md);
+      border-bottom: 3px solid var(--color-primary);
+    }
+
+    .monthly-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-2xl);
+      color: var(--color-primary);
+    }
+
+    .monthly-header .month-year {
+      font-size: var(--font-size-lg);
+      color: var(--color-text-muted);
+      margin-top: var(--space-xs);
+    }
+
+    .month-year .month-input {
+      border-bottom: 2px solid var(--color-border);
+      display: inline-block;
+      min-width: 140px;
+      min-height: 24px;
+    }
+
+    .month-year .year-input {
+      border-bottom: 2px solid var(--color-border);
+      display: inline-block;
+      min-width: 80px;
+      min-height: 24px;
+    }
+
+    /* ── Content Layout ──────────────────────────────────────── */
+    .content-layout {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 140px;
+      gap: var(--space-md);
+    }
+
+    /* ── Calendar Grid ───────────────────────────────────────── */
+    .calendar-section {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .calendar-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      grid-template-rows: auto repeat(6, 1fr);
+      gap: 0;
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .day-header {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-xs);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--color-primary);
+      text-align: center;
+      padding: var(--space-xs);
+      background: var(--color-surface);
+      border-bottom: 2px solid var(--color-primary);
+      border-right: 1px solid var(--color-border-light);
+    }
+
+    .day-header:last-child {
+      border-right: none;
+    }
+
+    .calendar-cell {
+      border-right: 1px solid var(--color-border-light);
+      border-bottom: 1px solid var(--color-border-light);
+      padding: 3px;
+      min-height: 52px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .calendar-cell:nth-child(7n) {
+      border-right: none;
+    }
+
+    .calendar-cell.weekend {
+      background: var(--color-surface);
+    }
+
+    .cell-number {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .cell-content {
+      flex: 1;
+    }
+
+    /* ── Sidebar ─────────────────────────────────────────────── */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-xs);
+      font-weight: 700;
+      color: var(--color-primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-sm);
+      padding-bottom: var(--space-xs);
+      border-bottom: 1px solid var(--color-border-light);
+    }
+
+    /* ── Monthly Goals ───────────────────────────────────────── */
+    .goals-section {
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm);
+      border-left: 4px solid var(--color-primary);
+    }
+
+    .goal-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      margin-bottom: var(--space-sm);
+    }
+
+    .goal-number {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-sm);
+      color: var(--color-primary);
+      opacity: 0.4;
+      font-weight: 700;
+      min-width: 16px;
+    }
+
+    .goal-line {
+      flex: 1;
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 18px;
+    }
+
+    /* ── Important Dates ─────────────────────────────────────── */
+    .dates-section {
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm);
+    }
+
+    .date-reminder-item {
+      display: flex;
+      gap: var(--space-xs);
+      margin-bottom: var(--space-sm);
+    }
+
+    .date-reminder-day {
+      border: 1px solid var(--color-border);
+      border-radius: 4px;
+      min-width: 28px;
+      min-height: 20px;
+      text-align: center;
+      font-size: var(--font-size-xs);
+      flex-shrink: 0;
+    }
+
+    .date-reminder-text {
+      flex: 1;
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 18px;
+      font-size: var(--font-size-xs);
+    }
+
+    /* ── Notes Area ──────────────────────────────────────────── */
+    .notes-section {
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm);
+      flex: 1;
+    }
+
+    .note-line {
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 18px;
+      margin-bottom: 6px;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────── */
+    .page-footer {
+      margin-top: var(--space-md);
+      padding-top: var(--space-sm);
+      border-top: 1px solid var(--color-border-light);
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div class="page" data-page="{{pageNumber}}">
+    <!-- Header -->
+    <div class="monthly-header">
+      <h1>{{title}}</h1>
+      <div class="month-year">
+        <span class="month-input"></span> / <span class="year-input"></span>
+      </div>
+    </div>
+
+    <!-- Content Layout -->
+    <div class="content-layout">
+      <!-- Calendar Grid -->
+      <div class="calendar-section">
+        <div class="calendar-grid">
+          <!-- Day Headers -->
+          <div class="day-header">Mon</div>
+          <div class="day-header">Tue</div>
+          <div class="day-header">Wed</div>
+          <div class="day-header">Thu</div>
+          <div class="day-header">Fri</div>
+          <div class="day-header">Sat</div>
+          <div class="day-header">Sun</div>
+
+          <!-- Row 1 -->
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell weekend"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell weekend"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <!-- Row 2 -->
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell weekend"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell weekend"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <!-- Row 3 -->
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell weekend"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell weekend"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <!-- Row 4 -->
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell weekend"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell weekend"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <!-- Row 5 -->
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell weekend"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell weekend"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <!-- Row 6 -->
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell weekend"><span class="cell-number"></span><div class="cell-content"></div></div>
+          <div class="calendar-cell weekend"><span class="cell-number"></span><div class="cell-content"></div></div>
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <!-- Monthly Goals -->
+        <div class="goals-section">
+          <div class="section-title">Monthly Goals</div>
+          <div class="goal-item"><span class="goal-number">1</span><div class="goal-line"></div></div>
+          <div class="goal-item"><span class="goal-number">2</span><div class="goal-line"></div></div>
+          <div class="goal-item"><span class="goal-number">3</span><div class="goal-line"></div></div>
+        </div>
+
+        <!-- Important Dates -->
+        <div class="dates-section">
+          <div class="section-title">Important Dates</div>
+          <div class="date-reminder-item"><div class="date-reminder-day"></div><div class="date-reminder-text"></div></div>
+          <div class="date-reminder-item"><div class="date-reminder-day"></div><div class="date-reminder-text"></div></div>
+          <div class="date-reminder-item"><div class="date-reminder-day"></div><div class="date-reminder-text"></div></div>
+          <div class="date-reminder-item"><div class="date-reminder-day"></div><div class="date-reminder-text"></div></div>
+          <div class="date-reminder-item"><div class="date-reminder-day"></div><div class="date-reminder-text"></div></div>
+          <div class="date-reminder-item"><div class="date-reminder-day"></div><div class="date-reminder-text"></div></div>
+        </div>
+
+        <!-- Notes -->
+        <div class="notes-section">
+          <div class="section-title">Notes</div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="page-footer">
+      <span>{{title}}</span>
+      <span>Page {{pageNumber}} of {{totalPages}}</span>
+    </div>
+  </div>
+</body>
+</html>

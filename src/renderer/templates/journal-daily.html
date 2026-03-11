@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}} — Daily Journal</title>
+  <style>
+    {{designSystemCss}}
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      font-family: var(--font-body);
+      font-size: var(--font-size-base);
+      color: var(--color-text);
+      background: var(--color-background);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    @media print {
+      .page { page-break-after: always; page-break-inside: avoid; }
+      .page:last-child { page-break-after: auto; }
+    }
+
+    @page { size: A4 portrait; margin: 15mm; }
+
+    .page {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      padding: 18mm 20mm;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ──────────────────────────────────────────────── */
+    .journal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: var(--space-lg);
+      padding-bottom: var(--space-md);
+      border-bottom: 3px solid var(--color-primary);
+    }
+
+    .journal-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-2xl);
+      color: var(--color-primary);
+    }
+
+    .header-right {
+      text-align: right;
+    }
+
+    .date-field {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-sm);
+    }
+
+    .date-input {
+      border-bottom: 2px solid var(--color-border);
+      min-width: 130px;
+      min-height: 22px;
+    }
+
+    /* ── Feeling Section ─────────────────────────────────────── */
+    .feeling-section {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      margin-bottom: var(--space-lg);
+      padding: var(--space-sm) var(--space-md);
+      background: var(--color-surface);
+      border-radius: 6px;
+    }
+
+    .feeling-label {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .feeling-circles {
+      display: flex;
+      gap: var(--space-sm);
+    }
+
+    .feeling-circle {
+      width: 28px;
+      height: 28px;
+      border: 2px solid var(--color-border);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      color: var(--color-text-muted);
+    }
+
+    .feeling-input {
+      flex: 1;
+      border-bottom: 1px solid var(--color-border);
+      min-height: 22px;
+    }
+
+    /* ── Section Title ───────────────────────────────────────── */
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-sm);
+      font-weight: 700;
+      color: var(--color-primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-sm);
+      padding-bottom: var(--space-xs);
+      border-bottom: 1px solid var(--color-border-light);
+    }
+
+    /* ── Morning Intentions ──────────────────────────────────── */
+    .intentions-section {
+      margin-bottom: var(--space-lg);
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm) var(--space-md);
+      border-left: 4px solid var(--color-primary);
+    }
+
+    .intention-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      margin-bottom: var(--space-sm);
+    }
+
+    .intention-number {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-lg);
+      color: var(--color-primary);
+      opacity: 0.3;
+      font-weight: 700;
+      min-width: 20px;
+    }
+
+    .intention-line {
+      flex: 1;
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 20px;
+    }
+
+    /* ── Main Writing Area ───────────────────────────────────── */
+    .writing-area {
+      flex: 1;
+      margin-bottom: var(--space-lg);
+    }
+
+    .writing-lines {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .write-line {
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 22px;
+    }
+
+    /* ── Evening Reflection ──────────────────────────────────── */
+    .reflection-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-md);
+      margin-bottom: var(--space-lg);
+    }
+
+    .reflection-item {
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm);
+    }
+
+    .reflection-item.full-width {
+      grid-column: 1 / -1;
+    }
+
+    .reflection-prompt {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: var(--space-sm);
+    }
+
+    .reflection-line {
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 20px;
+      margin-bottom: 6px;
+    }
+
+    /* ── Doodle Box ──────────────────────────────────────────── */
+    .doodle-section {
+      margin-bottom: var(--space-md);
+    }
+
+    .doodle-box {
+      border: 1px dashed var(--color-border);
+      border-radius: 8px;
+      min-height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .doodle-hint {
+      font-size: var(--font-size-xs);
+      color: var(--color-border);
+      font-style: italic;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────── */
+    .page-footer {
+      margin-top: auto;
+      padding-top: var(--space-sm);
+      border-top: 1px solid var(--color-border-light);
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div class="page" data-page="{{pageNumber}}">
+    <!-- Header -->
+    <div class="journal-header">
+      <h1>{{title}}</h1>
+      <div class="header-right">
+        <div class="date-field">
+          <span>Date:</span>
+          <div class="date-input"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- How I'm Feeling -->
+    <div class="feeling-section">
+      <span class="feeling-label">How I'm Feeling</span>
+      <div class="feeling-circles">
+        <div class="feeling-circle">1</div>
+        <div class="feeling-circle">2</div>
+        <div class="feeling-circle">3</div>
+        <div class="feeling-circle">4</div>
+        <div class="feeling-circle">5</div>
+      </div>
+      <div class="feeling-input"></div>
+    </div>
+
+    <!-- Morning Intentions -->
+    <div class="intentions-section">
+      <div class="section-title">Morning Intentions</div>
+      <div class="intention-item"><span class="intention-number">1</span><div class="intention-line"></div></div>
+      <div class="intention-item"><span class="intention-number">2</span><div class="intention-line"></div></div>
+      <div class="intention-item"><span class="intention-number">3</span><div class="intention-line"></div></div>
+    </div>
+
+    <!-- Main Journal Writing Area -->
+    <div class="writing-area">
+      <div class="section-title">Today's Thoughts</div>
+      <div class="writing-lines">
+        <div class="write-line"></div>
+        <div class="write-line"></div>
+        <div class="write-line"></div>
+        <div class="write-line"></div>
+        <div class="write-line"></div>
+        <div class="write-line"></div>
+        <div class="write-line"></div>
+        <div class="write-line"></div>
+        <div class="write-line"></div>
+        <div class="write-line"></div>
+        <div class="write-line"></div>
+        <div class="write-line"></div>
+      </div>
+    </div>
+
+    <!-- Evening Reflection -->
+    <div class="section-title">Evening Reflection</div>
+    <div class="reflection-grid">
+      <div class="reflection-item">
+        <div class="reflection-prompt">Best part of today</div>
+        <div class="reflection-line"></div>
+        <div class="reflection-line"></div>
+      </div>
+      <div class="reflection-item">
+        <div class="reflection-prompt">What I learned</div>
+        <div class="reflection-line"></div>
+        <div class="reflection-line"></div>
+      </div>
+      <div class="reflection-item full-width">
+        <div class="reflection-prompt">Tomorrow I will...</div>
+        <div class="reflection-line"></div>
+        <div class="reflection-line"></div>
+      </div>
+    </div>
+
+    <!-- Doodle / Sketch Box -->
+    <div class="doodle-section">
+      <div class="section-title">Doodle / Sketch</div>
+      <div class="doodle-box">
+        <span class="doodle-hint">draw something here</span>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="page-footer">
+      <span>{{title}}</span>
+      <span>Page {{pageNumber}} of {{totalPages}}</span>
+    </div>
+  </div>
+</body>
+</html>

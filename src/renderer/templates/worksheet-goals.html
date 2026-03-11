@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}} — Goal Setting Worksheet</title>
+  <style>
+    {{designSystemCss}}
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      font-family: var(--font-body);
+      font-size: var(--font-size-base);
+      color: var(--color-text);
+      background: var(--color-background);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    @media print {
+      .page { page-break-after: always; page-break-inside: avoid; }
+      .page:last-child { page-break-after: auto; }
+    }
+
+    @page { size: A4 portrait; margin: 15mm; }
+
+    .page {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      padding: 15mm;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ──────────────────────────────────────────────── */
+    .goals-header {
+      text-align: center;
+      margin-bottom: var(--space-lg);
+      padding-bottom: var(--space-md);
+      border-bottom: 3px solid var(--color-primary);
+    }
+
+    .goals-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-2xl);
+      color: var(--color-primary);
+    }
+
+    .goals-header .subtitle {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+      font-style: italic;
+      margin-top: var(--space-xs);
+    }
+
+    /* ── Section Title ───────────────────────────────────────── */
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-sm);
+      font-weight: 700;
+      color: var(--color-primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-sm);
+      padding-bottom: var(--space-xs);
+      border-bottom: 1px solid var(--color-border-light);
+    }
+
+    /* ── Goal Statement ──────────────────────────────────────── */
+    .goal-statement {
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: var(--space-md);
+      margin-bottom: var(--space-lg);
+      border-left: 4px solid var(--color-primary);
+    }
+
+    .smart-grid {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: var(--space-xs) var(--space-sm);
+      align-items: center;
+    }
+
+    .smart-label {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-xs);
+      font-weight: 700;
+      color: var(--color-primary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .smart-input {
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 22px;
+    }
+
+    /* ── Motivation Section ───────────────────────────────────── */
+    .motivation-section {
+      margin-bottom: var(--space-lg);
+      background: var(--color-surface);
+      border-radius: 6px;
+      padding: var(--space-sm) var(--space-md);
+    }
+
+    .motivation-lines {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .motivation-line {
+      border-bottom: 1px solid var(--color-border);
+      min-height: 22px;
+    }
+
+    /* ── Milestones Table ────────────────────────────────────── */
+    .milestones-section {
+      margin-bottom: var(--space-lg);
+    }
+
+    .milestones-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: var(--font-size-sm);
+    }
+
+    .milestones-table th {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      padding: var(--space-xs) var(--space-sm);
+      text-align: left;
+      color: var(--color-text-muted);
+      border-bottom: 2px solid var(--color-border);
+      font-weight: 700;
+    }
+
+    .milestones-table td {
+      padding: 5px var(--space-sm);
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 24px;
+    }
+
+    .milestones-table tr:nth-child(even) {
+      background: var(--color-surface);
+    }
+
+    .status-circle {
+      width: 14px;
+      height: 14px;
+      border: 1.5px solid var(--color-border);
+      border-radius: 50%;
+      margin: 0 auto;
+    }
+
+    /* ── Action Steps ────────────────────────────────────────── */
+    .actions-section {
+      margin-bottom: var(--space-lg);
+    }
+
+    .action-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      margin-bottom: 6px;
+    }
+
+    .action-checkbox {
+      width: 12px;
+      height: 12px;
+      border: 1.5px solid var(--color-border);
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    .action-line {
+      flex: 1;
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 18px;
+    }
+
+    /* ── Obstacles & Solutions ────────────────────────────────── */
+    .obstacles-section {
+      margin-bottom: var(--space-lg);
+    }
+
+    .two-col-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+    }
+
+    .col-header {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-xs);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: var(--space-xs) var(--space-sm);
+      border-bottom: 2px solid var(--color-border);
+    }
+
+    .col-header.obstacles {
+      color: #dc3545;
+      border-right: 1px solid var(--color-border);
+    }
+
+    .col-header.solutions {
+      color: #28a745;
+    }
+
+    .col-cell {
+      padding: 5px var(--space-sm);
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 28px;
+    }
+
+    .col-cell.left {
+      border-right: 1px solid var(--color-border);
+    }
+
+    /* ── Progress Tracker ────────────────────────────────────── */
+    .progress-section {
+      margin-bottom: var(--space-lg);
+    }
+
+    .progress-bar-track {
+      height: 20px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 10px;
+      position: relative;
+      margin-bottom: var(--space-xs);
+    }
+
+    .progress-markers {
+      display: flex;
+      justify-content: space-between;
+      font-size: 9px;
+      color: var(--color-text-muted);
+    }
+
+    .progress-notes {
+      display: flex;
+      gap: var(--space-sm);
+      margin-top: var(--space-sm);
+    }
+
+    .progress-note-item {
+      flex: 1;
+    }
+
+    .progress-note-label {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .progress-note-input {
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 18px;
+    }
+
+    /* ── Accountability ──────────────────────────────────────── */
+    .accountability-section {
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm) var(--space-md);
+      background: var(--color-surface);
+    }
+
+    .accountability-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-sm) var(--space-lg);
+    }
+
+    .accountability-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .accountability-label {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .accountability-input {
+      border-bottom: 1px solid var(--color-border);
+      min-height: 20px;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────── */
+    .page-footer {
+      margin-top: auto;
+      padding-top: var(--space-sm);
+      border-top: 1px solid var(--color-border-light);
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div class="page" data-page="{{pageNumber}}">
+    <!-- Header -->
+    <div class="goals-header">
+      <h1>{{title}}</h1>
+      <div class="subtitle">Define it. Plan it. Achieve it.</div>
+    </div>
+
+    <!-- Goal Statement (SMART format) -->
+    <div class="goal-statement">
+      <div class="section-title">My Goal (SMART)</div>
+      <div class="smart-grid">
+        <span class="smart-label">Specific</span><div class="smart-input"></div>
+        <span class="smart-label">Measurable</span><div class="smart-input"></div>
+        <span class="smart-label">Achievable</span><div class="smart-input"></div>
+        <span class="smart-label">Relevant</span><div class="smart-input"></div>
+        <span class="smart-label">Time-bound</span><div class="smart-input"></div>
+      </div>
+    </div>
+
+    <!-- Why This Goal Matters -->
+    <div class="motivation-section">
+      <div class="section-title">Why This Goal Matters</div>
+      <div class="motivation-lines">
+        <div class="motivation-line"></div>
+        <div class="motivation-line"></div>
+        <div class="motivation-line"></div>
+      </div>
+    </div>
+
+    <!-- Milestones -->
+    <div class="milestones-section">
+      <div class="section-title">Milestones</div>
+      <table class="milestones-table">
+        <thead>
+          <tr>
+            <th style="width: 50%;">Milestone</th>
+            <th style="width: 25%;">Target Date</th>
+            <th style="width: 25%; text-align: center;">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td></td><td></td><td><div class="status-circle"></div></td></tr>
+          <tr><td></td><td></td><td><div class="status-circle"></div></td></tr>
+          <tr><td></td><td></td><td><div class="status-circle"></div></td></tr>
+          <tr><td></td><td></td><td><div class="status-circle"></div></td></tr>
+          <tr><td></td><td></td><td><div class="status-circle"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Weekly Action Steps -->
+    <div class="actions-section">
+      <div class="section-title">Weekly Action Steps</div>
+      <div class="action-item"><div class="action-checkbox"></div><div class="action-line"></div></div>
+      <div class="action-item"><div class="action-checkbox"></div><div class="action-line"></div></div>
+      <div class="action-item"><div class="action-checkbox"></div><div class="action-line"></div></div>
+      <div class="action-item"><div class="action-checkbox"></div><div class="action-line"></div></div>
+      <div class="action-item"><div class="action-checkbox"></div><div class="action-line"></div></div>
+      <div class="action-item"><div class="action-checkbox"></div><div class="action-line"></div></div>
+    </div>
+
+    <!-- Obstacles & Solutions -->
+    <div class="obstacles-section">
+      <div class="section-title">Obstacles & Solutions</div>
+      <div class="two-col-layout">
+        <div class="col-header obstacles">Potential Obstacle</div>
+        <div class="col-header solutions">My Solution</div>
+        <div class="col-cell left"></div><div class="col-cell"></div>
+        <div class="col-cell left"></div><div class="col-cell"></div>
+        <div class="col-cell left"></div><div class="col-cell"></div>
+      </div>
+    </div>
+
+    <!-- Progress Tracker -->
+    <div class="progress-section">
+      <div class="section-title">Progress Tracker</div>
+      <div class="progress-bar-track"></div>
+      <div class="progress-markers">
+        <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+      </div>
+      <div class="progress-notes">
+        <div class="progress-note-item">
+          <div class="progress-note-label">Current progress</div>
+          <div class="progress-note-input"></div>
+        </div>
+        <div class="progress-note-item">
+          <div class="progress-note-label">Next checkpoint</div>
+          <div class="progress-note-input"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Accountability -->
+    <div class="accountability-section">
+      <div class="section-title">Accountability</div>
+      <div class="accountability-grid">
+        <div class="accountability-item">
+          <span class="accountability-label">Accountability partner</span>
+          <div class="accountability-input"></div>
+        </div>
+        <div class="accountability-item">
+          <span class="accountability-label">Check-in frequency</span>
+          <div class="accountability-input"></div>
+        </div>
+        <div class="accountability-item">
+          <span class="accountability-label">Reward for completing</span>
+          <div class="accountability-input"></div>
+        </div>
+        <div class="accountability-item">
+          <span class="accountability-label">Review date</span>
+          <div class="accountability-input"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="page-footer">
+      <span>{{title}}</span>
+      <span>Page {{pageNumber}} of {{totalPages}}</span>
+    </div>
+  </div>
+</body>
+</html>
