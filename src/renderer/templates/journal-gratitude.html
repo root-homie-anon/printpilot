@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}} — Gratitude Journal</title>
+  <style>
+    {{designSystemCss}}
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      font-family: var(--font-body);
+      font-size: var(--font-size-base);
+      color: var(--color-text);
+      background: var(--color-background);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    @media print {
+      .page { page-break-after: always; page-break-inside: avoid; }
+      .page:last-child { page-break-after: auto; }
+    }
+
+    @page { size: A4 portrait; margin: 15mm; }
+
+    .page {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      padding: 15mm;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ──────────────────────────────────────────────── */
+    .journal-header {
+      text-align: center;
+      margin-bottom: var(--space-xl);
+    }
+
+    .journal-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-2xl);
+      color: var(--color-primary);
+      margin-bottom: var(--space-sm);
+    }
+
+    .date-field {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-sm);
+      font-size: var(--font-size-lg);
+      color: var(--color-text-muted);
+      margin-top: var(--space-md);
+    }
+
+    .date-field .date-input {
+      border-bottom: 2px solid var(--color-primary);
+      min-width: 200px;
+      min-height: 28px;
+    }
+
+    /* ── Gratitude Sections ──────────────────────────────────── */
+    .gratitude-sections {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-lg);
+    }
+
+    .gratitude-item {
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: var(--space-md);
+      border-left: 4px solid var(--color-primary);
+    }
+
+    .gratitude-item .item-number {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-3xl);
+      color: var(--color-primary);
+      opacity: 0.3;
+      float: left;
+      margin-right: var(--space-md);
+      line-height: 1;
+    }
+
+    .gratitude-item .item-label {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-sm);
+    }
+
+    .gratitude-item .item-lines {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .gratitude-item .write-line {
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 24px;
+    }
+
+    /* ── Daily Reflection ────────────────────────────────────── */
+    .reflection-section {
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: var(--space-md);
+      background: var(--color-surface);
+    }
+
+    .reflection-section .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-base);
+      font-weight: 700;
+      color: var(--color-primary);
+      margin-bottom: var(--space-md);
+    }
+
+    .reflection-lines {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .reflection-line {
+      border-bottom: 1px solid var(--color-border);
+      min-height: 24px;
+    }
+
+    /* ── Mood Tracker Widget ─────────────────────────────────── */
+    .mood-tracker {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-lg);
+      margin-top: var(--space-lg);
+      padding: var(--space-md);
+    }
+
+    .mood-label {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .mood-options {
+      display: flex;
+      gap: var(--space-md);
+    }
+
+    .mood-option {
+      width: 32px;
+      height: 32px;
+      border: 2px solid var(--color-border);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+    }
+
+    /* ── Quote Footer ────────────────────────────────────────── */
+    .quote-footer {
+      margin-top: auto;
+      padding-top: var(--space-lg);
+      text-align: center;
+    }
+
+    .quote-footer .quote-box {
+      border-top: 1px solid var(--color-border-light);
+      padding-top: var(--space-md);
+    }
+
+    .quote-footer .quote-text {
+      font-style: italic;
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+      line-height: 1.6;
+    }
+
+    .quote-footer .quote-placeholder {
+      border-bottom: 1px dashed var(--color-border);
+      min-height: 20px;
+      display: inline-block;
+      min-width: 300px;
+    }
+
+    /* ── Page Footer ─────────────────────────────────────────── */
+    .page-footer {
+      margin-top: var(--space-md);
+      padding-top: var(--space-sm);
+      border-top: 1px solid var(--color-border-light);
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div class="page" data-page="{{pageNumber}}">
+    <!-- Header -->
+    <div class="journal-header">
+      <h1>{{title}}</h1>
+      <div class="date-field">
+        <span>Date:</span>
+        <div class="date-input"></div>
+      </div>
+    </div>
+
+    <!-- Gratitude Sections (3 items) -->
+    <div class="gratitude-sections">
+      <div class="gratitude-item">
+        <div class="item-number">1</div>
+        <div class="item-label">Today I am grateful for...</div>
+        <div class="item-lines">
+          <div class="write-line"></div>
+          <div class="write-line"></div>
+          <div class="write-line"></div>
+        </div>
+      </div>
+
+      <div class="gratitude-item">
+        <div class="item-number">2</div>
+        <div class="item-label">Today I am grateful for...</div>
+        <div class="item-lines">
+          <div class="write-line"></div>
+          <div class="write-line"></div>
+          <div class="write-line"></div>
+        </div>
+      </div>
+
+      <div class="gratitude-item">
+        <div class="item-number">3</div>
+        <div class="item-label">Today I am grateful for...</div>
+        <div class="item-lines">
+          <div class="write-line"></div>
+          <div class="write-line"></div>
+          <div class="write-line"></div>
+        </div>
+      </div>
+
+      <!-- Daily Reflection -->
+      <div class="reflection-section">
+        <div class="section-title">Daily Reflection</div>
+        <div class="reflection-lines">
+          <div class="reflection-line"></div>
+          <div class="reflection-line"></div>
+          <div class="reflection-line"></div>
+          <div class="reflection-line"></div>
+          <div class="reflection-line"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mood Tracker Widget -->
+    <div class="mood-tracker">
+      <span class="mood-label">Today's Mood:</span>
+      <div class="mood-options">
+        <div class="mood-option">1</div>
+        <div class="mood-option">2</div>
+        <div class="mood-option">3</div>
+        <div class="mood-option">4</div>
+        <div class="mood-option">5</div>
+      </div>
+    </div>
+
+    <!-- Inspirational Quote Footer -->
+    <div class="quote-footer">
+      <div class="quote-box">
+        <div class="quote-text">
+          <div class="quote-placeholder"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Page Footer -->
+    <div class="page-footer">
+      <span>{{title}}</span>
+      <span>Page {{pageNumber}} of {{totalPages}}</span>
+    </div>
+  </div>
+</body>
+</html>

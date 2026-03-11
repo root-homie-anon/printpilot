@@ -1,0 +1,48 @@
+{
+  "project": {
+    "name": "PrintPilot",
+    "slug": "printpilot",
+    "version": "1.0.0"
+  },
+  "pipeline": {
+    "productsPerDay": 2,
+    "marketingBufferDays": 2,
+    "pinterestDelayDays": 2,
+    "emailDelayDays": 3,
+    "blogDelayDays": 7
+  },
+  "credentials": {
+    "etsyOAuth": ".credentials/etsy-oauth.json",
+    "pinterestOAuth": ".credentials/pinterest-oauth.json",
+    "emailProvider": ".credentials/email.json",
+    "blogApi": ".credentials/blog.json"
+  },
+  "agents": {
+    "designer": {
+      "pageSize": "A4",
+      "exportDpi": 300,
+      "referenceLibraryPath": "src/renderer/reference-library"
+    },
+    "researcher": {
+      "maxOpportunitiesPerRun": 10,
+      "minReviewCount": 50,
+      "targetPriceRange": [3, 25]
+    },
+    "marketing": {
+      "pinsPerProduct": 3,
+      "emailEnabled": true,
+      "blogEnabled": true
+    }
+  },
+  "notifications": {
+    "channel": "telegram",
+    "approvalRequired": true,
+    "weeklyReviewDay": "sunday"
+  },
+  "features": {
+    "autoPublish": false,
+    "autoSynthesize": true,
+    "dashboardEnabled": true,
+    "marketingEnabled": true
+  }
+}

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}} — Habit Tracker</title>
+  <style>
+    {{designSystemCss}}
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      font-family: var(--font-body);
+      font-size: var(--font-size-base);
+      color: var(--color-text);
+      background: var(--color-background);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    @media print {
+      .page { page-break-after: always; page-break-inside: avoid; }
+      .page:last-child { page-break-after: auto; }
+    }
+
+    @page { size: A4 portrait; margin: 15mm; }
+
+    .page {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      padding: 15mm;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ──────────────────────────────────────────────── */
+    .tracker-header {
+      text-align: center;
+      margin-bottom: var(--space-lg);
+    }
+
+    .tracker-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-2xl);
+      color: var(--color-primary);
+    }
+
+    .tracker-header .motivational {
+      font-size: var(--font-size-base);
+      color: var(--color-text-muted);
+      font-style: italic;
+      margin-top: var(--space-xs);
+    }
+
+    .month-label {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-lg);
+      color: var(--color-secondary);
+      margin-top: var(--space-sm);
+    }
+
+    /* ── Habit Grid ──────────────────────────────────────────── */
+    .habit-grid {
+      flex: 1;
+      width: 100%;
+      border-collapse: collapse;
+      font-size: var(--font-size-xs);
+    }
+
+    .habit-grid th {
+      font-family: var(--font-heading);
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      padding: 3px 2px;
+      text-align: center;
+      color: var(--color-text-muted);
+      border-bottom: 2px solid var(--color-primary);
+    }
+
+    .habit-grid th.habit-name-col {
+      text-align: left;
+      width: 80px;
+      font-size: var(--font-size-xs);
+    }
+
+    .habit-grid td {
+      border: 1px solid var(--color-border-light);
+      text-align: center;
+      padding: 0;
+      height: 20px;
+      width: 16px;
+    }
+
+    .habit-grid td.habit-name {
+      text-align: left;
+      padding: 3px 6px;
+      border-left: 3px solid var(--color-primary);
+      font-weight: 600;
+      font-size: var(--font-size-xs);
+      color: var(--color-text);
+      width: 80px;
+    }
+
+    .habit-grid tr:nth-child(even) {
+      background-color: var(--color-surface);
+    }
+
+    .habit-grid tr.habit-row:hover td {
+      background-color: rgba(74, 144, 217, 0.05);
+    }
+
+    .day-cell {
+      position: relative;
+    }
+
+    /* ── Progress Section ────────────────────────────────────── */
+    .progress-section {
+      margin-top: var(--space-lg);
+      padding: var(--space-md);
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+    }
+
+    .progress-section .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-sm);
+      font-weight: 700;
+      color: var(--color-primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-md);
+    }
+
+    .progress-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-md);
+    }
+
+    .progress-item {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+
+    .progress-item .label {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .progress-bar-track {
+      height: 12px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+    }
+
+    .progress-note {
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 20px;
+      margin-top: var(--space-xs);
+    }
+
+    /* ── Footer ──────────────────────────────────────────────── */
+    .page-footer {
+      margin-top: var(--space-md);
+      padding-top: var(--space-sm);
+      border-top: 1px solid var(--color-border-light);
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div class="page" data-page="{{pageNumber}}">
+    <!-- Motivational Header -->
+    <div class="tracker-header">
+      <h1>{{title}}</h1>
+      <div class="motivational">Small daily improvements lead to stunning results.</div>
+      <div class="month-label">Month: _______________</div>
+    </div>
+
+    <!-- Monthly Habit Grid (31 days x 10 habit rows) -->
+    <table class="habit-grid">
+      <thead>
+        <tr>
+          <th class="habit-name-col">Habit</th>
+          <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th>
+          <th>6</th><th>7</th><th>8</th><th>9</th><th>10</th>
+          <th>11</th><th>12</th><th>13</th><th>14</th><th>15</th>
+          <th>16</th><th>17</th><th>18</th><th>19</th><th>20</th>
+          <th>21</th><th>22</th><th>23</th><th>24</th><th>25</th>
+          <th>26</th><th>27</th><th>28</th><th>29</th><th>30</th>
+          <th>31</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="habit-row"><td class="habit-name"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td></tr>
+        <tr class="habit-row"><td class="habit-name"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td></tr>
+        <tr class="habit-row"><td class="habit-name"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td></tr>
+        <tr class="habit-row"><td class="habit-name"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td></tr>
+        <tr class="habit-row"><td class="habit-name"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td></tr>
+        <tr class="habit-row"><td class="habit-name"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td></tr>
+        <tr class="habit-row"><td class="habit-name"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td></tr>
+        <tr class="habit-row"><td class="habit-name"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td></tr>
+        <tr class="habit-row"><td class="habit-name"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td></tr>
+        <tr class="habit-row"><td class="habit-name"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td><td class="day-cell"></td></tr>
+      </tbody>
+    </table>
+
+    <!-- Progress Section -->
+    <div class="progress-section">
+      <div class="section-title">Monthly Progress & Reflections</div>
+      <div class="progress-grid">
+        <div class="progress-item">
+          <div class="label">Best habit this month</div>
+          <div class="progress-note"></div>
+        </div>
+        <div class="progress-item">
+          <div class="label">Habit to improve</div>
+          <div class="progress-note"></div>
+        </div>
+        <div class="progress-item">
+          <div class="label">What worked well</div>
+          <div class="progress-note"></div>
+        </div>
+        <div class="progress-item">
+          <div class="label">Next month's focus</div>
+          <div class="progress-note"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="page-footer">
+      <span>{{title}}</span>
+      <span>Page {{pageNumber}} of {{totalPages}}</span>
+    </div>
+  </div>
+</body>
+</html>

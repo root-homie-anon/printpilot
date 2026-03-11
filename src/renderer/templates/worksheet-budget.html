@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}} — Budget Worksheet</title>
+  <style>
+    {{designSystemCss}}
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      font-family: var(--font-body);
+      font-size: var(--font-size-base);
+      color: var(--color-text);
+      background: var(--color-background);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    @media print {
+      .page { page-break-after: always; page-break-inside: avoid; }
+      .page:last-child { page-break-after: auto; }
+    }
+
+    @page { size: A4 portrait; margin: 15mm; }
+
+    .page {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      padding: 15mm;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ──────────────────────────────────────────────── */
+    .budget-header {
+      text-align: center;
+      margin-bottom: var(--space-lg);
+      padding-bottom: var(--space-md);
+      border-bottom: 3px solid var(--color-primary);
+    }
+
+    .budget-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-2xl);
+      color: var(--color-primary);
+    }
+
+    .budget-header .period {
+      font-size: var(--font-size-lg);
+      color: var(--color-text-muted);
+      margin-top: var(--space-xs);
+    }
+
+    /* ── Section Styles ──────────────────────────────────────── */
+    .budget-section {
+      margin-bottom: var(--space-lg);
+    }
+
+    .section-header {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-base);
+      font-weight: 700;
+      color: var(--color-background);
+      background: var(--color-primary);
+      padding: var(--space-xs) var(--space-sm);
+      border-radius: 4px;
+      margin-bottom: var(--space-sm);
+      display: flex;
+      justify-content: space-between;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .section-header.expenses {
+      background: #dc3545;
+    }
+
+    .section-header.summary {
+      background: #28a745;
+    }
+
+    .section-header.savings {
+      background: var(--color-secondary);
+    }
+
+    /* ── Table Rows ──────────────────────────────────────────── */
+    .budget-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .budget-table td {
+      padding: 5px var(--space-sm);
+      border-bottom: 1px solid var(--color-border-light);
+      font-size: var(--font-size-sm);
+    }
+
+    .budget-table td.label-col {
+      width: 55%;
+      color: var(--color-text);
+    }
+
+    .budget-table td.planned-col,
+    .budget-table td.actual-col {
+      width: 22.5%;
+      border-bottom: 1px solid var(--color-border);
+      text-align: right;
+    }
+
+    .budget-table thead td {
+      font-weight: 700;
+      font-size: var(--font-size-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--color-text-muted);
+      border-bottom: 2px solid var(--color-border);
+      padding-bottom: var(--space-xs);
+    }
+
+    .budget-table .subtotal-row td {
+      font-weight: 700;
+      border-top: 2px solid var(--color-border);
+      border-bottom: 2px solid var(--color-border);
+      padding-top: var(--space-sm);
+      padding-bottom: var(--space-sm);
+    }
+
+    .budget-table .category-label {
+      font-style: italic;
+      color: var(--color-text-muted);
+      font-size: var(--font-size-xs);
+    }
+
+    /* ── Summary Box ─────────────────────────────────────────── */
+    .summary-box {
+      border: 2px solid #28a745;
+      border-radius: 8px;
+      padding: var(--space-md);
+      margin-top: var(--space-md);
+    }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      padding: var(--space-xs) 0;
+      font-size: var(--font-size-base);
+    }
+
+    .summary-row.total {
+      font-weight: 700;
+      font-size: var(--font-size-lg);
+      border-top: 2px solid #28a745;
+      padding-top: var(--space-sm);
+      margin-top: var(--space-xs);
+    }
+
+    .summary-row .amount-blank {
+      border-bottom: 1px solid var(--color-border);
+      min-width: 120px;
+      text-align: right;
+    }
+
+    /* ── Savings Goal ────────────────────────────────────────── */
+    .savings-goal {
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: var(--space-md);
+      margin-top: var(--space-md);
+    }
+
+    .savings-goal .goal-header {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-sm);
+      font-weight: 700;
+      color: var(--color-secondary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-sm);
+    }
+
+    .goal-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-sm);
+    }
+
+    .goal-item {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+
+    .goal-item .goal-label {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+    }
+
+    .goal-item .goal-input {
+      border-bottom: 1px solid var(--color-border);
+      min-height: 22px;
+    }
+
+    .progress-bar-container {
+      grid-column: 1 / -1;
+      margin-top: var(--space-sm);
+    }
+
+    .progress-bar-label {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-xs);
+    }
+
+    .progress-bar-track {
+      height: 16px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      position: relative;
+    }
+
+    .progress-bar-markers {
+      display: flex;
+      justify-content: space-between;
+      font-size: 9px;
+      color: var(--color-text-muted);
+      margin-top: 2px;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────── */
+    .page-footer {
+      margin-top: auto;
+      padding-top: var(--space-sm);
+      border-top: 1px solid var(--color-border-light);
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div class="page" data-page="{{pageNumber}}">
+    <!-- Header -->
+    <div class="budget-header">
+      <h1>{{title}}</h1>
+      <div class="period">Month: _______________  Year: _________</div>
+    </div>
+
+    <!-- Income Section -->
+    <div class="budget-section">
+      <div class="section-header">
+        <span>Income</span>
+        <span>Planned / Actual</span>
+      </div>
+      <table class="budget-table">
+        <thead>
+          <tr>
+            <td class="label-col">Source</td>
+            <td class="planned-col">Planned</td>
+            <td class="actual-col">Actual</td>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="label-col">Primary salary/wages</td><td class="planned-col"></td><td class="actual-col"></td></tr>
+          <tr><td class="label-col">Secondary income</td><td class="planned-col"></td><td class="actual-col"></td></tr>
+          <tr><td class="label-col">Freelance/side hustle</td><td class="planned-col"></td><td class="actual-col"></td></tr>
+          <tr><td class="label-col">Investments/dividends</td><td class="planned-col"></td><td class="actual-col"></td></tr>
+          <tr><td class="label-col">Other</td><td class="planned-col"></td><td class="actual-col"></td></tr>
+          <tr class="subtotal-row"><td class="label-col">Total Income</td><td class="planned-col"></td><td class="actual-col"></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Expenses Section -->
+    <div class="budget-section">
+      <div class="section-header expenses">
+        <span>Expenses</span>
+        <span>Planned / Actual</span>
+      </div>
+      <table class="budget-table">
+        <thead>
+          <tr>
+            <td class="label-col">Category</td>
+            <td class="planned-col">Planned</td>
+            <td class="actual-col">Actual</td>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="label-col"><span class="category-label">Housing</span></td><td class="planned-col"></td><td class="actual-col"></td></tr>
+          <tr><td class="label-col">Rent/mortgage</td><td class="planned-col"></td><td class="actual-col"></td></tr>
+          <tr><td class="label-col">Utilities</td><td class="planned-col"></td><td class="actual-col"></td></tr>
+          <tr><td class="label-col"><span class="category-label">Food</span></td><td class="planned-col"></td><td class="actual-col"></td></tr>
+          <tr><td class="label-col">Groceries</td><td class="planned-col"></td><td class="actual-col"></td></tr>
+          <tr><td class="label-col">Dining out</td><td class="planned-col"></td><td class="actual-col"></td></tr>
+          <tr><td class="label-col"><span class="category-label">Transport</span></td><td class="planned-col"></td><td class="actual-col"></td></tr>
+          <tr><td class="label-col">Gas/fuel</td><td class="planned-col"></td><td class="actual-col"></td></tr>
+          <tr><td class="label-col">Public transit</td><td class="planned-col"></td><td class="actual-col"></td></tr>
+          <tr><td class="label-col"><span class="category-label">Personal</span></td><td class="planned-col"></td><td class="actual-col"></td></tr>
+          <tr><td class="label-col">Insurance</td><td class="planned-col"></td><td class="actual-col"></td></tr>
+          <tr><td class="label-col">Subscriptions</td><td class="planned-col"></td><td class="actual-col"></td></tr>
+          <tr><td class="label-col">Entertainment</td><td class="planned-col"></td><td class="actual-col"></td></tr>
+          <tr><td class="label-col">Other</td><td class="planned-col"></td><td class="actual-col"></td></tr>
+          <tr class="subtotal-row"><td class="label-col">Total Expenses</td><td class="planned-col"></td><td class="actual-col"></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Summary -->
+    <div class="summary-box">
+      <div class="section-header summary">
+        <span>Summary</span>
+      </div>
+      <div class="summary-row">
+        <span>Total Income</span>
+        <div class="amount-blank"></div>
+      </div>
+      <div class="summary-row">
+        <span>Total Expenses</span>
+        <div class="amount-blank"></div>
+      </div>
+      <div class="summary-row total">
+        <span>Net (Income - Expenses)</span>
+        <div class="amount-blank"></div>
+      </div>
+    </div>
+
+    <!-- Savings Goal Tracker -->
+    <div class="savings-goal">
+      <div class="goal-header">Savings Goal Tracker</div>
+      <div class="goal-grid">
+        <div class="goal-item">
+          <div class="goal-label">Goal Name</div>
+          <div class="goal-input"></div>
+        </div>
+        <div class="goal-item">
+          <div class="goal-label">Target Amount</div>
+          <div class="goal-input"></div>
+        </div>
+        <div class="goal-item">
+          <div class="goal-label">Current Saved</div>
+          <div class="goal-input"></div>
+        </div>
+        <div class="goal-item">
+          <div class="goal-label">Remaining</div>
+          <div class="goal-input"></div>
+        </div>
+        <div class="progress-bar-container">
+          <div class="progress-bar-label">Progress</div>
+          <div class="progress-bar-track"></div>
+          <div class="progress-bar-markers">
+            <span>0%</span>
+            <span>25%</span>
+            <span>50%</span>
+            <span>75%</span>
+            <span>100%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="page-footer">
+      <span>{{title}}</span>
+      <span>Page {{pageNumber}} of {{totalPages}}</span>
+    </div>
+  </div>
+</body>
+</html>

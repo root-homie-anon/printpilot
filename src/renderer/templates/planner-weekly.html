@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}} — Weekly Planner</title>
+  <style>
+    {{designSystemCss}}
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      font-family: var(--font-body);
+      font-size: var(--font-size-base);
+      color: var(--color-text);
+      background: var(--color-background);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    @media print {
+      .page {
+        page-break-after: always;
+        page-break-inside: avoid;
+      }
+      .page:last-child {
+        page-break-after: auto;
+      }
+    }
+
+    @page {
+      size: A4 portrait;
+      margin: 15mm;
+    }
+
+    .page {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      padding: 15mm;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Week Header ─────────────────────────────────────────── */
+    .week-header {
+      text-align: center;
+      margin-bottom: var(--space-lg);
+      padding-bottom: var(--space-md);
+      border-bottom: 3px solid var(--color-primary);
+    }
+
+    .week-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-2xl);
+      color: var(--color-primary);
+      margin-bottom: var(--space-xs);
+    }
+
+    .week-header .date-range {
+      font-size: var(--font-size-lg);
+      color: var(--color-text-muted);
+      font-style: italic;
+    }
+
+    /* ── 7-Day Grid ──────────────────────────────────────────── */
+    .days-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: repeat(4, 1fr);
+      gap: var(--space-sm);
+    }
+
+    .day-cell {
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .day-cell.weekend {
+      background-color: var(--color-surface);
+    }
+
+    .day-name {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-sm);
+      font-weight: 700;
+      color: var(--color-primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-xs);
+      padding-bottom: var(--space-xs);
+      border-bottom: 1px solid var(--color-border-light);
+    }
+
+    .day-date {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-xs);
+    }
+
+    .day-tasks {
+      flex: 1;
+    }
+
+    .task-line {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      margin-bottom: 6px;
+    }
+
+    .task-checkbox {
+      width: 12px;
+      height: 12px;
+      border: 1.5px solid var(--color-border);
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    .task-input {
+      flex: 1;
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 16px;
+    }
+
+    /* ── Notes Section ───────────────────────────────────────── */
+    .notes-section {
+      grid-column: 1 / -1;
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: var(--space-sm);
+    }
+
+    .notes-section .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-sm);
+      font-weight: 700;
+      color: var(--color-secondary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-sm);
+    }
+
+    .notes-lines {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .note-line {
+      border-bottom: 1px solid var(--color-border-light);
+      min-height: 18px;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────── */
+    .page-footer {
+      margin-top: var(--space-md);
+      padding-top: var(--space-sm);
+      border-top: 1px solid var(--color-border-light);
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div class="page" data-page="{{pageNumber}}">
+    <!-- Week Header -->
+    <div class="week-header">
+      <h1>{{title}}</h1>
+      <div class="date-range">Week of _____ / _____ / _____</div>
+    </div>
+
+    <!-- 7-Day Grid -->
+    <div class="days-grid">
+      <div class="day-cell">
+        <div class="day-name">Monday</div>
+        <div class="day-date">Date: _________</div>
+        <div class="day-tasks">
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+        </div>
+      </div>
+
+      <div class="day-cell">
+        <div class="day-name">Tuesday</div>
+        <div class="day-date">Date: _________</div>
+        <div class="day-tasks">
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+        </div>
+      </div>
+
+      <div class="day-cell">
+        <div class="day-name">Wednesday</div>
+        <div class="day-date">Date: _________</div>
+        <div class="day-tasks">
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+        </div>
+      </div>
+
+      <div class="day-cell">
+        <div class="day-name">Thursday</div>
+        <div class="day-date">Date: _________</div>
+        <div class="day-tasks">
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+        </div>
+      </div>
+
+      <div class="day-cell">
+        <div class="day-name">Friday</div>
+        <div class="day-date">Date: _________</div>
+        <div class="day-tasks">
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+        </div>
+      </div>
+
+      <div class="day-cell weekend">
+        <div class="day-name">Saturday</div>
+        <div class="day-date">Date: _________</div>
+        <div class="day-tasks">
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+        </div>
+      </div>
+
+      <div class="day-cell weekend">
+        <div class="day-name">Sunday</div>
+        <div class="day-date">Date: _________</div>
+        <div class="day-tasks">
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+          <div class="task-line"><div class="task-checkbox"></div><div class="task-input"></div></div>
+        </div>
+      </div>
+
+      <!-- Notes Section -->
+      <div class="notes-section">
+        <div class="section-title">Notes & Priorities</div>
+        <div class="notes-lines">
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="page-footer">
+      <span>{{title}}</span>
+      <span>Page {{pageNumber}} of {{totalPages}}</span>
+    </div>
+  </div>
+</body>
+</html>

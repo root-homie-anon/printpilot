@@ -1,0 +1,39 @@
+{
+  "name": "printpilot",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Fully automated digital product business engine for Etsy printables",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "lint": "eslint src/ --ext .ts",
+    "format": "prettier --write 'src/**/*.ts'",
+    "test": "vitest run",
+    "dashboard": "tsx src/dashboard/server.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+
+    "node-cron": "^3.0.3",
+    "puppeteer": "^23.11.0",
+    "sharp": "^0.33.5",
+    "telegraf": "^4.16.3",
+    "winston": "^3.17.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.13.0",
+    "eslint": "^9.19.0",
+    "prettier": "^3.4.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.4"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PrintPilot Dashboard</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+  <header class="app-header">
+    <h1>PrintPilot</h1>
+    <nav class="nav-links">
+      <a href="#dashboard" class="active" data-view="dashboard">Dashboard</a>
+      <a href="#products" data-view="products">Products</a>
+      <a href="#approvals" data-view="approvals">Approvals</a>
+      <a href="#niches" data-view="niches">Niches</a>
+      <a href="#marketing" data-view="marketing">Marketing</a>
+      <a href="#activity" data-view="activity">Activity</a>
+    </nav>
+    <div class="header-actions">
+      <button class="theme-toggle" id="theme-toggle">Dark Mode</button>
+    </div>
+  </header>
+
+  <main class="main-content">
+
+    <!-- ── Dashboard View ────────────────────────────────────────── -->
+    <section id="view-dashboard" class="view-section active">
+      <div class="dashboard-grid">
+
+        <!-- Metrics Row -->
+        <div class="card full-width">
+          <div class="card-header">
+            <span class="card-title">Overview</span>
+          </div>
+          <div class="metric-row" id="metrics-row">
+            <div class="metric-item">
+              <span class="metric-value" id="metric-products">--</span>
+              <span class="metric-label">Total Products</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-value" id="metric-listings">--</span>
+              <span class="metric-label">Live Listings</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-value" id="metric-revenue">--</span>
+              <span class="metric-label">Est. Monthly Revenue</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-value" id="metric-views">--</span>
+              <span class="metric-label">Total Views</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-value" id="metric-conversion">--</span>
+              <span class="metric-label">Avg Conversion</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pipeline Overview -->
+        <div class="card full-width">
+          <div class="card-header">
+            <span class="card-title">Pipeline</span>
+          </div>
+          <div class="pipeline-stages" id="pipeline-stages">
+            <div class="pipeline-stage">
+              <span class="stage-count" id="stage-research">0</span>
+              <span class="stage-label">Research</span>
+            </div>
+            <div class="pipeline-stage">
+              <span class="stage-count" id="stage-strategy">0</span>
+              <span class="stage-label">Strategy</span>
+            </div>
+            <div class="pipeline-stage">
+              <span class="stage-count" id="stage-design">0</span>
+              <span class="stage-label">Design</span>
+            </div>
+            <div class="pipeline-stage">
+              <span class="stage-count" id="stage-copy">0</span>
+              <span class="stage-label">Copy</span>
+            </div>
+            <div class="pipeline-stage">
+              <span class="stage-count" id="stage-scoring">0</span>
+              <span class="stage-label">Scoring</span>
+            </div>
+            <div class="pipeline-stage">
+              <span class="stage-count" id="stage-approval">0</span>
+              <span class="stage-label">Approval</span>
+            </div>
+            <div class="pipeline-stage">
+              <span class="stage-count" id="stage-listed">0</span>
+              <span class="stage-label">Listed</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quality Trend -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Quality Trend</span>
+          </div>
+          <div class="chart-area">
+            <canvas id="quality-chart"></canvas>
+            <span>Chart.js integration placeholder</span>
+          </div>
+        </div>
+
+        <!-- Niche Leaderboard (compact) -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Top Niches</span>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Niche</th>
+                  <th>Products</th>
+                  <th>Revenue</th>
+                </tr>
+              </thead>
+              <tbody id="niches-compact"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Recent Products -->
+        <div class="card full-width">
+          <div class="card-header">
+            <span class="card-title">Recent Products</span>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Niche</th>
+                  <th>Status</th>
+                  <th>Score</th>
+                  <th>Stage</th>
+                </tr>
+              </thead>
+              <tbody id="recent-products"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── Products View ─────────────────────────────────────────── -->
+    <section id="view-products" class="view-section">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">All Products</span>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Title</th>
+                <th>Niche</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Score</th>
+                <th>Stage</th>
+              </tr>
+            </thead>
+            <tbody id="all-products"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Approvals View ────────────────────────────────────────── -->
+    <section id="view-approvals" class="view-section">
+      <div id="pending-approvals"></div>
+      <div class="empty-state" id="no-approvals" style="display: none;">
+        <p>No products pending approval.</p>
+      </div>
+    </section>
+
+    <!-- ── Niches View ───────────────────────────────────────────── -->
+    <section id="view-niches" class="view-section">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Niche Performance Leaderboard</span>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Niche</th>
+                <th>Products</th>
+                <th>Total Revenue</th>
+                <th>Avg Score</th>
+              </tr>
+            </thead>
+            <tbody id="niches-full"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Marketing View ────────────────────────────────────────── -->
+    <section id="view-marketing" class="view-section">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Marketing Queue</span>
+        </div>
+        <div id="marketing-queue"></div>
+        <div class="empty-state" id="no-marketing" style="display: none;">
+          <p>No upcoming marketing actions scheduled.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Activity View ─────────────────────────────────────────── -->
+    <section id="view-activity" class="view-section">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Agent Activity Log (Last 7 Days)</span>
+        </div>
+        <ul class="activity-list" id="activity-log"></ul>
+        <div class="empty-state" id="no-activity" style="display: none;">
+          <p>No recent activity recorded.</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

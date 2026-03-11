@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}}</title>
+  <style>
+    /* ── Design System CSS Variables ─────────────────────────── */
+    {{designSystemCss}}
+
+    /* ── Reset & Base ────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      font-family: var(--font-body);
+      font-size: var(--font-size-base);
+      color: var(--color-text);
+      background: var(--color-background);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    /* ── Print Styles ────────────────────────────────────────── */
+    @media print {
+      html, body {
+        width: var(--page-width);
+        height: var(--page-height);
+      }
+
+      .page {
+        width: var(--page-width);
+        height: var(--page-height);
+        page-break-after: always;
+        page-break-inside: avoid;
+        overflow: hidden;
+      }
+
+      .page:last-child {
+        page-break-after: auto;
+      }
+    }
+
+    @page {
+      size: A4 portrait;
+      margin: var(--margin-top) var(--margin-right) var(--margin-bottom) var(--margin-left);
+    }
+
+    /* ── Page Layout ─────────────────────────────────────────── */
+    .page {
+      width: var(--page-width);
+      min-height: var(--page-height);
+      padding: var(--margin-top) var(--margin-right) var(--margin-bottom) var(--margin-left);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* ── Header Slot ─────────────────────────────────────────── */
+    [data-slot="header"] {
+      flex-shrink: 0;
+      margin-bottom: var(--space-lg);
+      border-bottom: 2px solid var(--color-primary);
+      padding-bottom: var(--space-md);
+    }
+
+    [data-slot="header"] h1 {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-2xl);
+      color: var(--color-primary);
+      line-height: 1.2;
+    }
+
+    [data-slot="header"] .subtitle {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+      margin-top: var(--space-xs);
+    }
+
+    /* ── Content Slot ────────────────────────────────────────── */
+    [data-slot="content"] {
+      flex: 1;
+    }
+
+    /* ── Footer Slot ─────────────────────────────────────────── */
+    [data-slot="footer"] {
+      flex-shrink: 0;
+      margin-top: auto;
+      padding-top: var(--space-md);
+      border-top: 1px solid var(--color-border-light);
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* ── Utility Classes ─────────────────────────────────────── */
+    .text-center { text-align: center; }
+    .text-muted { color: var(--color-text-muted); }
+    .mt-sm { margin-top: var(--space-sm); }
+    .mt-md { margin-top: var(--space-md); }
+    .mt-lg { margin-top: var(--space-lg); }
+    .mb-sm { margin-bottom: var(--space-sm); }
+    .mb-md { margin-bottom: var(--space-md); }
+    .mb-lg { margin-bottom: var(--space-lg); }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-md);
+    }
+
+    .grid-7 {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: var(--space-sm);
+    }
+
+    .input-line {
+      border-bottom: 1px solid var(--color-border);
+      min-height: 24px;
+      margin-bottom: var(--space-sm);
+    }
+
+    .input-box {
+      border: 1px solid var(--color-border);
+      border-radius: 4px;
+      min-height: 40px;
+      padding: var(--space-sm);
+    }
+
+    .label {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: var(--space-xs);
+    }
+  </style>
+</head>
+<body>
+  <div class="page" data-page="{{pageNumber}}">
+    <!-- Header Slot -->
+    <div data-slot="header">
+      <h1>{{title}}</h1>
+      <div class="subtitle">{{description}}</div>
+    </div>
+
+    <!-- Content Slot -->
+    <div data-slot="content">
+      <!-- Template-specific content goes here -->
+    </div>
+
+    <!-- Footer Slot -->
+    <div data-slot="footer">
+      <span>{{title}}</span>
+      <span>Page {{pageNumber}} of {{totalPages}}</span>
+    </div>
+  </div>
+</body>
+</html>
