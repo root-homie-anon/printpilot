@@ -14,6 +14,7 @@ import { updateNicheRegistry } from './tracker/niche-updater.js';
 import { logActivity } from './tracker/activity-log.js';
 import { startBot, stopBot } from './notifications/telegram-bot.js';
 import { sendDailySummary } from './utils/notify.js';
+import { registerAllAgents } from './agents/register-all.js';
 import type { ProductBrief, PipelineResult } from './types/index.js';
 
 const REQUIRED_ENV_VARS = [
@@ -136,41 +137,46 @@ async function runDailyPipeline(): Promise<void> {
   const briefs: ProductBrief[] = strategyResult.data;
   logger.info(`Strategy selected ${briefs.length} products`);
 
-  // Stage 3-5: Design, Copy, Score (per product)
-  for (const brief of briefs) {
-    logger.info(`--- Processing product: ${brief.id} ---`);
-    result.productsProcessed++;
+  // Stage 3-5: Design, Copy, Score (per product) — run in parallel
+  const productResults = await Promise.allSettled(
+    briefs.map(async (brief) => {
+      logger.info(`--- Processing product: ${brief.id} ---`);
+      result.productsProcessed++;
 
-    // Design
-    logger.info('Stage 3: Design');
-    const designResult = await runDesign(brief);
-    if (!designResult.success) {
-      logger.error(`Design failed for ${brief.id}, skipping`);
-      result.errors.push(`${brief.id}: design failed`);
-      continue;
+      // Design
+      logger.info(`Stage 3: Design for ${brief.id}`);
+      const designResult = await runDesign(brief);
+      if (!designResult.success) {
+        throw new Error(`design failed: ${designResult.error}`);
+      }
+
+      // Copywriting
+      logger.info(`Stage 4: Copywriting for ${brief.id}`);
+      const copyResult = await runCopywriting(brief.id);
+      if (!copyResult.success) {
+        throw new Error(`copywriting failed: ${copyResult.error}`);
+      }
+
+      // Scoring
+      logger.info(`Stage 5: Scoring for ${brief.id}`);
+      const scoreResult = await runScoring(brief.id);
+      if (!scoreResult.success) {
+        throw new Error(`scoring failed: ${scoreResult.error}`);
+      }
+
+      logger.info(
+        `Product ${brief.id} scored: ${scoreResult.data?.recommendation ?? 'unknown'}`
+      );
+    })
+  );
+
+  for (const [i, settled] of productResults.entries()) {
+    if (settled.status === 'rejected') {
+      const brief = briefs[i];
+      const message = settled.reason instanceof Error ? settled.reason.message : String(settled.reason);
+      logger.error(`Product ${brief?.id} failed: ${message}`);
+      result.errors.push(`${brief?.id}: ${message}`);
     }
-
-    // Copywriting
-    logger.info('Stage 4: Copywriting');
-    const copyResult = await runCopywriting(brief.id);
-    if (!copyResult.success) {
-      logger.error(`Copywriting failed for ${brief.id}, skipping`);
-      result.errors.push(`${brief.id}: copywriting failed`);
-      continue;
-    }
-
-    // Scoring
-    logger.info('Stage 5: Scoring');
-    const scoreResult = await runScoring(brief.id);
-    if (!scoreResult.success) {
-      logger.error(`Scoring failed for ${brief.id}, skipping`);
-      result.errors.push(`${brief.id}: scoring failed`);
-      continue;
-    }
-
-    logger.info(
-      `Product ${brief.id} scored: ${scoreResult.data?.recommendation ?? 'unknown'}`
-    );
   }
 
   // Update metrics and niche registry
@@ -208,12 +214,17 @@ async function runWeeklySynthesis(): Promise<void> {
   await aggregateMetrics();
   await updateNicheRegistry();
 
-  logger.info('Weekly metrics aggregated and niche registry updated');
+  // Run the synthesizer (feedback ingestion + instruction updates)
+  const { runSynthesis } = await import('./synthesizer/run.js');
+  const synthesisResult = await runSynthesis();
+
+  logger.info(`Synthesis complete: ${synthesisResult.patternsFound} patterns, ${synthesisResult.instructionsUpdated} updates`);
 
   await logActivity({
     timestamp: new Date().toISOString(),
     agent: 'orchestrator',
     action: 'weekly-synthesis-complete',
+    details: `${synthesisResult.patternsFound} patterns, ${synthesisResult.instructionsUpdated} updates`,
     success: true,
   });
 
@@ -222,8 +233,8 @@ async function runWeeklySynthesis(): Promise<void> {
 
 async function startDashboard(): Promise<void> {
   logger.info('Starting dashboard server...');
-  // Dashboard server is started via src/dashboard/server.ts
-  logger.info('Dashboard module not yet implemented — use `npm run dashboard` directly');
+  const { startDashboardServer } = await import('./dashboard/server.js');
+  await startDashboardServer();
 }
 
 function setupCronSchedules(): void {
@@ -299,6 +310,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  registerAllAgents();
   setupGracefulShutdown();
 
   switch (mode) {

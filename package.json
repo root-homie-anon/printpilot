@@ -17,8 +17,10 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
+    "@mendable/firecrawl-js": "^4.16.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "google-trends-api": "^4.9.2",
     "node-cron": "^3.0.3",
     "puppeteer": "^23.11.0",
     "sharp": "^0.33.5",

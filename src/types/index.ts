@@ -134,11 +134,9 @@ export interface PipelineResult {
 }
 
 export interface SynthesisResult {
-  updatesApplied: number;
-  agentsUpdated: string[];
-  patternsExtracted: number;
-  changelogEntries: string[];
-  synthesizedAt: string;
+  patternsFound: number;
+  instructionsUpdated: number;
+  agentsAffected: string[];
 }
 
 export interface ApprovalDecision {

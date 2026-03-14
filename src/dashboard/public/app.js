@@ -2,19 +2,20 @@
 
 'use strict';
 
-const API_BASE = '';
-const REFRESH_INTERVAL_MS = 30000;
+var API_BASE = '';
+var REFRESH_INTERVAL_MS = 30000;
 
 // ── State ────────────────────────────────────────────────────────────
 
-let currentView = 'dashboard';
-let refreshTimer = null;
+var currentView = 'dashboard';
+var refreshTimer = null;
+var qualityHistory = [];
 
 // ── API Helpers ──────────────────────────────────────────────────────
 
 function getAuthHeaders() {
-  const token = localStorage.getItem('dashboard_token');
-  const headers = { 'Content-Type': 'application/json' };
+  var token = localStorage.getItem('dashboard_token');
+  var headers = { 'Content-Type': 'application/json' };
   if (token) {
     headers['Authorization'] = 'Bearer ' + token;
   }
@@ -23,7 +24,7 @@ function getAuthHeaders() {
 
 async function apiFetch(endpoint) {
   try {
-    const response = await fetch(API_BASE + endpoint, {
+    var response = await fetch(API_BASE + endpoint, {
       headers: getAuthHeaders(),
     });
     if (!response.ok) {
@@ -38,7 +39,7 @@ async function apiFetch(endpoint) {
 
 async function apiPost(endpoint, body) {
   try {
-    const response = await fetch(API_BASE + endpoint, {
+    var response = await fetch(API_BASE + endpoint, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(body),
@@ -58,7 +59,7 @@ async function apiPost(endpoint, body) {
 function escapeHtml(text) {
   if (!text) return '';
   var div = document.createElement('div');
-  div.appendChild(document.createTextNode(text));
+  div.appendChild(document.createTextNode(String(text)));
   return div.innerHTML;
 }
 
@@ -70,15 +71,26 @@ function formatPercent(value) {
   return ((value || 0) * 100).toFixed(1) + '%';
 }
 
+function formatNumber(num) {
+  return (num || 0).toLocaleString();
+}
+
 function formatDate(dateStr) {
   if (!dateStr) return '--';
   var d = new Date(dateStr);
   return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+function formatDateShort(dateStr) {
+  if (!dateStr) return '--';
+  var d = new Date(dateStr);
+  return d.toLocaleDateString();
+}
+
 function badgeHtml(status) {
-  var cls = 'badge badge-' + (status || 'pending').toLowerCase().replace(/\s+/g, '-');
-  return '<span class="' + cls + '">' + escapeHtml(status || 'pending') + '</span>';
+  if (!status) status = 'pending';
+  var cls = 'badge badge-' + status.toLowerCase().replace(/\s+/g, '-');
+  return '<span class="' + cls + '">' + escapeHtml(status) + '</span>';
 }
 
 function showToast(message, type) {
@@ -92,7 +104,53 @@ function showToast(message, type) {
   }, 4000);
 }
 
-// ── Data Loading & Rendering ─────────────────────────────────────────
+function scoreColor(score) {
+  if (score >= 80) return 'var(--color-success)';
+  if (score >= 60) return 'var(--color-info)';
+  if (score >= 40) return 'var(--color-warning)';
+  return 'var(--color-danger)';
+}
+
+function ratingStars(value) {
+  var html = '';
+  for (var i = 1; i <= 5; i++) {
+    html += '<span style="color:' + (i <= value ? 'var(--color-warning)' : 'var(--color-border)') + ';font-size:1rem;">&#9733;</span>';
+  }
+  return html;
+}
+
+// ── Helper: extract product display data from API shape ──────────────
+
+function getProductTitle(p) {
+  if (p.product && p.product.title) return p.product.title;
+  if (p.brief && p.brief.niche) {
+    return p.brief.niche.split('-').map(function (w) {
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    }).join(' ');
+  }
+  return p.id.slice(0, 8);
+}
+
+function getProductNiche(p) {
+  if (p.product && p.product.niche) return p.product.niche;
+  if (p.brief && p.brief.niche) return p.brief.niche;
+  return '--';
+}
+
+function getProductStatus(p) {
+  if (p.product && p.product.status) return p.product.status;
+  return 'pending';
+}
+
+function getOverallScore(p) {
+  if (p.scores) {
+    var s = p.scores;
+    return ((s.layout + s.typography + s.color + s.differentiation + s.sellability) / 5).toFixed(1);
+  }
+  return '--';
+}
+
+// ── Dashboard View ──────────────────────────────────────────────────
 
 async function loadDashboard() {
   var results = await Promise.all([
@@ -110,10 +168,10 @@ async function loadDashboard() {
   // Metrics
   if (metricsData && metricsData.metrics) {
     var m = metricsData.metrics;
-    document.getElementById('metric-products').textContent = m.totalProducts;
-    document.getElementById('metric-listings').textContent = m.liveListings;
+    document.getElementById('metric-products').textContent = formatNumber(m.totalProducts);
+    document.getElementById('metric-listings').textContent = formatNumber(m.liveListings);
     document.getElementById('metric-revenue').textContent = formatCurrency(m.totalRevenue);
-    document.getElementById('metric-views').textContent = m.totalViews.toLocaleString();
+    document.getElementById('metric-views').textContent = formatNumber(m.totalViews);
     document.getElementById('metric-conversion').textContent = formatPercent(m.avgConversionRate);
   }
 
@@ -132,6 +190,7 @@ async function loadDashboard() {
   // Recent products
   if (productsData && productsData.products) {
     renderRecentProducts(productsData.products);
+    updateQualityChart(productsData.products);
   }
 
   // Compact niches
@@ -147,14 +206,21 @@ function renderRecentProducts(products) {
     return;
   }
 
-  var rows = products.slice(0, 10).map(function (p) {
-    var title = (p.brief && p.brief.title) ? escapeHtml(p.brief.title) : escapeHtml(p.id);
-    var niche = (p.brief && p.brief.niche) ? escapeHtml(p.brief.niche) : '--';
-    var status = p.approval ? p.approval.status : 'pending';
-    var score = (p.score && p.score.overallScore != null) ? p.score.overallScore.toFixed(1) : '--';
+  var sorted = products.slice().sort(function (a, b) {
+    var dateA = (a.product && a.product.createdAt) || '';
+    var dateB = (b.product && b.product.createdAt) || '';
+    return dateB.localeCompare(dateA);
+  });
+
+  var rows = sorted.slice(0, 10).map(function (p) {
+    var title = getProductTitle(p);
+    var niche = getProductNiche(p);
+    var status = getProductStatus(p);
+    var score = getOverallScore(p);
+
     return '<tr>' +
-      '<td>' + title + '</td>' +
-      '<td>' + niche + '</td>' +
+      '<td>' + escapeHtml(title) + '</td>' +
+      '<td>' + escapeHtml(niche) + '</td>' +
       '<td>' + badgeHtml(status) + '</td>' +
       '<td>' + score + '</td>' +
       '<td>' + badgeHtml(p.stage) + '</td>' +
@@ -182,6 +248,128 @@ function renderNichesCompact(niches) {
   tbody.innerHTML = rows;
 }
 
+// ── Quality Trend Chart (Canvas) ─────────────────────────────────────
+
+function updateQualityChart(products) {
+  var canvas = document.getElementById('quality-chart');
+  if (!canvas) return;
+
+  var scored = products.filter(function (p) { return p.scores; });
+  if (scored.length < 2) {
+    var container = canvas.parentElement;
+    container.innerHTML = '<span>Not enough data for trend chart (need 2+ scored products)</span>';
+    return;
+  }
+
+  // Sort by creation date
+  scored.sort(function (a, b) {
+    var da = (a.product && a.product.createdAt) || '';
+    var db = (b.product && b.product.createdAt) || '';
+    return da.localeCompare(db);
+  });
+
+  // Extract scores
+  var labels = [];
+  var avgScores = [];
+  scored.forEach(function (p) {
+    var s = p.scores;
+    var avg = (s.layout + s.typography + s.color + s.differentiation + s.sellability) / 5;
+    avgScores.push(avg);
+    var date = (p.product && p.product.createdAt) ? formatDateShort(p.product.createdAt) : '';
+    labels.push(date);
+  });
+
+  drawLineChart(canvas, labels, avgScores, 'Avg Quality Score');
+}
+
+function drawLineChart(canvas, labels, data, title) {
+  var ctx = canvas.getContext('2d');
+  var w = canvas.parentElement.clientWidth - 8;
+  var h = 180;
+  canvas.width = w * 2;
+  canvas.height = h * 2;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  ctx.scale(2, 2);
+
+  var padLeft = 40;
+  var padRight = 16;
+  var padTop = 24;
+  var padBottom = 32;
+  var chartW = w - padLeft - padRight;
+  var chartH = h - padTop - padBottom;
+
+  var maxVal = Math.max.apply(null, data.concat([100]));
+  var minVal = Math.min.apply(null, data.concat([0]));
+  var range = maxVal - minVal || 1;
+
+  // Background
+  var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  ctx.fillStyle = isDark ? '#2c2e33' : '#f1f3f5';
+  ctx.fillRect(0, 0, w, h);
+
+  // Title
+  ctx.fillStyle = isDark ? '#909296' : '#6c757d';
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.fillText(title, padLeft, 14);
+
+  // Y axis labels
+  ctx.textAlign = 'right';
+  ctx.fillStyle = isDark ? '#909296' : '#6c757d';
+  ctx.font = '9px -apple-system, sans-serif';
+  for (var i = 0; i <= 4; i++) {
+    var yVal = minVal + (range * i / 4);
+    var yPos = padTop + chartH - (chartH * i / 4);
+    ctx.fillText(Math.round(yVal).toString(), padLeft - 6, yPos + 3);
+    // Grid line
+    ctx.strokeStyle = isDark ? '#373a40' : '#dee2e6';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(padLeft, yPos);
+    ctx.lineTo(padLeft + chartW, yPos);
+    ctx.stroke();
+  }
+
+  // Draw line
+  ctx.strokeStyle = '#4263eb';
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+
+  var stepX = data.length > 1 ? chartW / (data.length - 1) : chartW;
+
+  data.forEach(function (val, idx) {
+    var x = padLeft + idx * stepX;
+    var y = padTop + chartH - ((val - minVal) / range * chartH);
+    if (idx === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Draw dots
+  data.forEach(function (val, idx) {
+    var x = padLeft + idx * stepX;
+    var y = padTop + chartH - ((val - minVal) / range * chartH);
+    ctx.fillStyle = '#4263eb';
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // X axis labels
+  ctx.fillStyle = isDark ? '#909296' : '#6c757d';
+  ctx.font = '8px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  var labelStep = Math.max(1, Math.floor(labels.length / 6));
+  labels.forEach(function (label, idx) {
+    if (idx % labelStep === 0 || idx === labels.length - 1) {
+      var x = padLeft + idx * stepX;
+      ctx.fillText(label, x, h - 6);
+    }
+  });
+}
+
 // ── Products View ────────────────────────────────────────────────────
 
 async function loadProducts() {
@@ -195,15 +383,16 @@ async function loadProducts() {
   }
 
   var rows = data.products.map(function (p) {
-    var title = (p.brief && p.brief.title) ? escapeHtml(p.brief.title) : '--';
-    var niche = (p.brief && p.brief.niche) ? escapeHtml(p.brief.niche) : '--';
-    var type = (p.brief && p.brief.productType) ? escapeHtml(p.brief.productType) : '--';
-    var status = p.approval ? p.approval.status : 'pending';
-    var score = (p.score && p.score.overallScore != null) ? p.score.overallScore.toFixed(1) : '--';
+    var title = getProductTitle(p);
+    var niche = getProductNiche(p);
+    var type = (p.brief && p.brief.sections && p.brief.sections[0]) ? 'Printable' : '--';
+    var status = getProductStatus(p);
+    var score = getOverallScore(p);
+
     return '<tr>' +
-      '<td><code>' + escapeHtml(p.id) + '</code></td>' +
-      '<td>' + title + '</td>' +
-      '<td>' + niche + '</td>' +
+      '<td><code title="' + escapeHtml(p.id) + '">' + escapeHtml(p.id.slice(0, 8)) + '</code></td>' +
+      '<td>' + escapeHtml(title) + '</td>' +
+      '<td>' + escapeHtml(niche) + '</td>' +
       '<td>' + type + '</td>' +
       '<td>' + badgeHtml(status) + '</td>' +
       '<td>' + score + '</td>' +
@@ -221,7 +410,8 @@ async function loadApprovals() {
   if (!data || !data.products) return;
 
   var pending = data.products.filter(function (p) {
-    return p.stage === 'approval' || (p.approval && p.approval.status === 'pending');
+    var status = getProductStatus(p);
+    return p.stage === 'approval' || status === 'scored';
   });
 
   var container = document.getElementById('pending-approvals');
@@ -236,24 +426,36 @@ async function loadApprovals() {
   emptyEl.style.display = 'none';
 
   var html = pending.map(function (p) {
-    var title = (p.brief && p.brief.title) ? escapeHtml(p.brief.title) : escapeHtml(p.id);
-    var niche = (p.brief && p.brief.niche) ? escapeHtml(p.brief.niche) : '--';
+    var title = getProductTitle(p);
+    var niche = getProductNiche(p);
 
     var scoreHtml = '';
-    if (p.score) {
+    if (p.scores) {
+      var s = p.scores;
       scoreHtml = '<div class="score-summary">' +
-        '<div class="score-item"><span class="score-value">' + (p.score.marketScore || 0).toFixed(1) + '</span><span class="score-label">Market</span></div>' +
-        '<div class="score-item"><span class="score-value">' + (p.score.designScore || 0).toFixed(1) + '</span><span class="score-label">Design</span></div>' +
-        '<div class="score-item"><span class="score-value">' + (p.score.copyScore || 0).toFixed(1) + '</span><span class="score-label">Copy</span></div>' +
-        '<div class="score-item"><span class="score-value">' + (p.score.overallScore || 0).toFixed(1) + '</span><span class="score-label">Overall</span></div>' +
+        '<div class="score-item"><span class="score-value" style="color:' + scoreColor(s.layout) + '">' + s.layout + '</span><span class="score-label">Layout</span></div>' +
+        '<div class="score-item"><span class="score-value" style="color:' + scoreColor(s.typography) + '">' + s.typography + '</span><span class="score-label">Typography</span></div>' +
+        '<div class="score-item"><span class="score-value" style="color:' + scoreColor(s.color) + '">' + s.color + '</span><span class="score-label">Color</span></div>' +
+        '<div class="score-item"><span class="score-value" style="color:' + scoreColor(s.differentiation) + '">' + s.differentiation + '</span><span class="score-label">Differentiation</span></div>' +
+        '<div class="score-item"><span class="score-value" style="color:' + scoreColor(s.sellability) + '">' + s.sellability + '</span><span class="score-label">Sellability</span></div>' +
+        '</div>';
+    }
+
+    var briefHtml = '';
+    if (p.brief) {
+      briefHtml = '<div style="margin:12px 0;font-size:0.875rem;">' +
+        '<strong>Pages:</strong> ' + (p.brief.pageCount || '--') +
+        ' &middot; <strong>Audience:</strong> ' + escapeHtml(p.brief.targetAudience) +
+        ' &middot; <strong>Font:</strong> ' + escapeHtml(p.brief.styleGuide && p.brief.styleGuide.primaryFont) +
+        ' &middot; <strong>Palette:</strong> ' + escapeHtml(p.brief.styleGuide && p.brief.styleGuide.palette) +
         '</div>';
     }
 
     return '<div class="card approval-card" style="margin-bottom: 16px;">' +
-      '<div class="card-header"><span class="card-title">Pending Approval: ' + title + '</span><span>' + niche + '</span></div>' +
+      '<div class="card-header"><span class="card-title">Pending: ' + escapeHtml(title) + '</span><span>' + badgeHtml(niche) + '</span></div>' +
+      briefHtml +
       scoreHtml +
-      (p.score ? '<p style="margin-bottom: 12px;">Recommendation: <strong>' + escapeHtml(p.score.recommendation) + '</strong></p>' : '') +
-      '<div class="btn-group">' +
+      '<div class="btn-group" style="margin-top:12px;">' +
       '<button class="btn btn-success btn-sm" onclick="submitApproval(\'' + p.id + '\', \'approve\')">Approve</button>' +
       '<button class="btn btn-outline btn-sm" onclick="submitApproval(\'' + p.id + '\', \'revise\')">Request Revision</button>' +
       '<button class="btn btn-danger btn-sm" onclick="submitApproval(\'' + p.id + '\', \'reject\')">Reject</button>' +
@@ -267,29 +469,28 @@ async function loadApprovals() {
   container.innerHTML = html;
 }
 
-function buildFeedbackForm(productId) {
-  var fields = [
-    { key: 'layoutQuality', label: 'Layout Quality' },
-    { key: 'typography', label: 'Typography' },
-    { key: 'colorAestheticMatch', label: 'Color/Aesthetic' },
-    { key: 'differentiation', label: 'Differentiation' },
-    { key: 'overallSellability', label: 'Sellability' },
-  ];
+function buildRatingInput(name, label) {
+  var html = '<div class="form-group">' +
+    '<label class="form-label">' + label + '</label>' +
+    '<div class="rating-input">';
+  for (var i = 1; i <= 5; i++) {
+    html += '<label>' +
+      '<input type="radio" name="' + name + '" value="' + i + '">' +
+      '<span>' + i + '</span>' +
+      '</label>';
+  }
+  html += '</div></div>';
+  return html;
+}
 
+function buildFeedbackForm(productId) {
   var html = '<form id="feedback-form-' + productId + '" onsubmit="submitFeedback(event, \'' + productId + '\')">';
 
-  fields.forEach(function (f) {
-    html += '<div class="form-group">' +
-      '<label class="form-label">' + f.label + '</label>' +
-      '<div class="rating-input">';
-    for (var i = 1; i <= 5; i++) {
-      html += '<label style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid var(--color-border);border-radius:4px;cursor:pointer;">' +
-        '<input type="radio" name="' + f.key + '" value="' + i + '" style="display:none;">' +
-        '<span style="padding:4px 8px;" onclick="this.parentElement.style.background=\'var(--color-primary)\';this.parentElement.style.color=\'#fff\'">' + i + '</span>' +
-        '</label>';
-    }
-    html += '</div></div>';
-  });
+  html += buildRatingInput('layout', 'Layout Quality');
+  html += buildRatingInput('typography', 'Typography');
+  html += buildRatingInput('colorAesthetic', 'Color / Aesthetic Match');
+  html += buildRatingInput('differentiation', 'Differentiation');
+  html += buildRatingInput('sellability', 'Overall Sellability');
 
   html += '<div class="form-group">' +
     '<label class="form-label">Problem Source</label>' +
@@ -301,8 +502,16 @@ function buildFeedbackForm(productId) {
     '</select></div>';
 
   html += '<div class="form-group">' +
+    '<label class="form-label">Decision</label>' +
+    '<div class="rating-input">' +
+    '<label style="width:auto;padding:0 12px;"><input type="radio" name="decision" value="approve"><span>Approve</span></label>' +
+    '<label style="width:auto;padding:0 12px;"><input type="radio" name="decision" value="revise"><span>Revise</span></label>' +
+    '<label style="width:auto;padding:0 12px;"><input type="radio" name="decision" value="reject"><span>Reject</span></label>' +
+    '</div></div>';
+
+  html += '<div class="form-group">' +
     '<label class="form-label">Specific Issues</label>' +
-    '<textarea name="specificIssues" class="form-textarea" placeholder="Optional notes..."></textarea>' +
+    '<textarea name="issues" class="form-textarea" placeholder="Optional notes..."></textarea>' +
     '</div>';
 
   html += '<button type="submit" class="btn btn-primary btn-sm">Submit Feedback</button>';
@@ -329,30 +538,37 @@ async function submitFeedback(event, productId) {
   var formData = new FormData(form);
 
   var body = {
-    layoutQuality: parseInt(formData.get('layoutQuality'), 10),
+    layout: parseInt(formData.get('layout'), 10),
     typography: parseInt(formData.get('typography'), 10),
-    colorAestheticMatch: parseInt(formData.get('colorAestheticMatch'), 10),
+    color: parseInt(formData.get('colorAesthetic'), 10),
     differentiation: parseInt(formData.get('differentiation'), 10),
-    overallSellability: parseInt(formData.get('overallSellability'), 10),
-    problemSource: formData.get('problemSource'),
-    specificIssues: formData.get('specificIssues') || '',
+    sellability: parseInt(formData.get('sellability'), 10),
+    issues: formData.get('issues') || '',
+    source: formData.get('problemSource'),
+    decision: formData.get('decision'),
   };
 
-  // Validate
-  if (!body.layoutQuality || !body.typography || !body.colorAestheticMatch ||
-      !body.differentiation || !body.overallSellability) {
+  if (!body.layout || !body.typography || !body.color ||
+      !body.differentiation || !body.sellability) {
     showToast('Please fill in all rating fields', 'error');
     return;
   }
 
-  if (!body.problemSource) {
+  if (!body.source) {
     showToast('Please select a problem source', 'error');
+    return;
+  }
+
+  if (!body.decision) {
+    showToast('Please select a decision', 'error');
     return;
   }
 
   var result = await apiPost('/api/feedback/' + productId, body);
   if (result && result.success) {
     showToast('Feedback submitted', 'success');
+    // Also submit the approval decision
+    await submitApproval(productId, body.decision);
   } else {
     showToast('Failed to submit feedback', 'error');
   }
@@ -371,12 +587,20 @@ async function loadNiches() {
   }
 
   var rows = data.niches.map(function (n, idx) {
+    var barWidth = n.totalRevenue > 0 ? Math.min(100, (n.totalRevenue / Math.max.apply(null, data.niches.map(function (x) { return x.totalRevenue; }))) * 100) : 0;
     return '<tr>' +
       '<td>' + (idx + 1) + '</td>' +
-      '<td>' + escapeHtml(n.niche) + '</td>' +
+      '<td><strong>' + escapeHtml(n.niche) + '</strong></td>' +
       '<td>' + n.productCount + '</td>' +
-      '<td>' + formatCurrency(n.totalRevenue) + '</td>' +
-      '<td>' + n.avgScore.toFixed(2) + '</td>' +
+      '<td>' +
+        '<div style="display:flex;align-items:center;gap:8px;">' +
+        '<div style="flex:1;height:6px;background:var(--color-surface-alt);border-radius:3px;">' +
+        '<div style="width:' + barWidth + '%;height:100%;background:var(--color-primary);border-radius:3px;"></div>' +
+        '</div>' +
+        '<span>' + formatCurrency(n.totalRevenue) + '</span>' +
+        '</div>' +
+      '</td>' +
+      '<td style="color:' + scoreColor(n.avgScore * 20) + '">' + n.avgScore.toFixed(1) + '/5</td>' +
       '</tr>';
   }).join('');
 
@@ -386,13 +610,17 @@ async function loadNiches() {
 // ── Marketing View ───────────────────────────────────────────────────
 
 async function loadMarketing() {
-  var data = await apiFetch('/api/listings');
-  if (!data || !data.listings) return;
+  var results = await Promise.all([
+    apiFetch('/api/listings'),
+    apiFetch('/api/products'),
+  ]);
+
+  var listingsData = results[0];
 
   var container = document.getElementById('marketing-queue');
   var emptyEl = document.getElementById('no-marketing');
 
-  if (!data.listings.length) {
+  if (!listingsData || !listingsData.listings || !listingsData.listings.length) {
     container.innerHTML = '';
     emptyEl.style.display = 'block';
     return;
@@ -400,13 +628,38 @@ async function loadMarketing() {
 
   emptyEl.style.display = 'none';
 
-  var html = data.listings.map(function (l) {
-    return '<div class="marketing-item">' +
-      '<span>' + escapeHtml(l.title || l.productId) + '</span>' +
-      '<span>' + badgeHtml(l.status) + '</span>' +
-      '<span>Listed: ' + formatDate(l.listedAt) + '</span>' +
-      '</div>';
+  var html = '<div class="table-wrapper"><table>' +
+    '<thead><tr>' +
+    '<th>Listing</th>' +
+    '<th>Status</th>' +
+    '<th>Price</th>' +
+    '<th>Pinterest</th>' +
+    '<th>Email</th>' +
+    '<th>Blog</th>' +
+    '<th>Published</th>' +
+    '</tr></thead><tbody>';
+
+  html += listingsData.listings.map(function (l) {
+    var pinterestBadge = '<span class="badge badge-pending">Pending</span>';
+    var emailBadge = '<span class="badge badge-pending">Pending</span>';
+    var blogBadge = '<span class="badge badge-pending">Pending</span>';
+
+    return '<tr>' +
+      '<td>' + escapeHtml(l.title || l.listingId) + '</td>' +
+      '<td>' + badgeHtml(l.status) + '</td>' +
+      '<td>' + formatCurrency(l.price) + '</td>' +
+      '<td>' + pinterestBadge + '</td>' +
+      '<td>' + emailBadge + '</td>' +
+      '<td>' + blogBadge + '</td>' +
+      '<td>' + formatDate(l.publishedAt) + '</td>' +
+      '</tr>';
   }).join('');
+
+  html += '</tbody></table></div>';
+
+  html += '<div style="margin-top:16px;padding:12px;background:var(--color-surface-alt);border-radius:8px;font-size:0.875rem;">' +
+    '<strong>Schedule:</strong> Pinterest pins go live Day+2 after listing. Email notification Day+3. SEO blog post Day+7.' +
+    '</div>';
 
   container.innerHTML = html;
 }
@@ -428,15 +681,338 @@ async function loadActivity() {
 
   emptyEl.style.display = 'none';
 
-  var html = data.activity.map(function (a) {
+  // Sort by timestamp descending
+  var sorted = data.activity.slice().sort(function (a, b) {
+    return (b.timestamp || '').localeCompare(a.timestamp || '');
+  });
+
+  var html = sorted.map(function (a) {
+    var agentColor = {
+      researcher: 'var(--color-info)',
+      strategist: 'var(--color-primary)',
+      designer: '#9c36b5',
+      copywriter: '#e67700',
+      scorer: 'var(--color-warning)',
+      orchestrator: 'var(--color-text-muted)',
+    }[a.agent] || 'var(--color-text)';
+
     return '<li class="activity-item">' +
       '<span class="activity-time">' + formatDate(a.timestamp) + '</span>' +
-      '<span class="activity-agent">' + escapeHtml(a.agent) + '</span>' +
-      '<span class="activity-action">' + escapeHtml(a.action) + (a.productId ? ' (' + escapeHtml(a.productId) + ')' : '') + '</span>' +
+      '<span class="activity-agent" style="color:' + agentColor + '">' + escapeHtml(a.agent) + '</span>' +
+      '<span class="activity-action">' + escapeHtml(a.action) +
+        (a.details ? ' &mdash; ' + escapeHtml(a.details.slice(0, 120)) : '') +
+      '</span>' +
       '</li>';
   }).join('');
 
   list.innerHTML = html;
+}
+
+// ── Reviews View ─────────────────────────────────────────────────────
+
+async function loadReviews() {
+  await loadFeedbackHistory();
+}
+
+async function loadDailyReviewForm(productId) {
+  if (!productId) {
+    var input = document.getElementById('daily-review-product-id');
+    productId = input ? input.value.trim() : '';
+  }
+  if (!productId) {
+    showToast('Please enter a product ID', 'error');
+    return;
+  }
+
+  var container = document.getElementById('daily-review-form-container');
+  container.innerHTML = '<div class="loading">Loading...</div>';
+
+  var data = await apiFetch('/api/review/daily/' + encodeURIComponent(productId));
+  if (!data || !data.formData) {
+    container.innerHTML = '<div class="empty-state"><p>Product not found or failed to load.</p></div>';
+    return;
+  }
+
+  var fd = data.formData;
+  var html = '';
+
+  // Show product info if available
+  if (fd.brief) {
+    html += '<div style="margin-bottom: var(--spacing-md); padding: var(--spacing-md); background: var(--color-surface-alt); border-radius: var(--radius-md);">' +
+      '<strong>' + escapeHtml(fd.brief.title || fd.productId) + '</strong>' +
+      (fd.brief.niche ? ' &mdash; ' + escapeHtml(fd.brief.niche) : '') +
+      (fd.brief.productType ? ' (' + escapeHtml(fd.brief.productType) + ')' : '') +
+      '</div>';
+  }
+
+  // Show existing scores if available
+  if (fd.scores) {
+    html += '<div class="score-summary" style="margin-bottom: var(--spacing-md);">' +
+      '<div class="score-item"><span class="score-value">' + (fd.scores.layout || 0) + '</span><span class="score-label">Layout</span></div>' +
+      '<div class="score-item"><span class="score-value">' + (fd.scores.typography || 0) + '</span><span class="score-label">Typography</span></div>' +
+      '<div class="score-item"><span class="score-value">' + (fd.scores.color || 0) + '</span><span class="score-label">Color</span></div>' +
+      '<div class="score-item"><span class="score-value">' + (fd.scores.differentiation || 0) + '</span><span class="score-label">Differentiation</span></div>' +
+      '<div class="score-item"><span class="score-value">' + (fd.scores.sellability || 0) + '</span><span class="score-label">Sellability</span></div>' +
+      '</div>';
+  }
+
+  // Show existing review notice if already reviewed today
+  if (fd.existingReview) {
+    var r = fd.existingReview;
+    html += '<div style="margin-bottom:var(--spacing-md);padding:var(--spacing-md);background:var(--color-info-bg);border-radius:var(--radius-md);font-size:0.875rem;">' +
+      '<strong>Already reviewed today:</strong> ' +
+      'Layout ' + r.layout + '/5, Typography ' + r.typography + '/5, Color ' + r.colorAesthetic + '/5, ' +
+      'Diff ' + r.differentiation + '/5, Sell ' + r.sellability + '/5 &mdash; ' +
+      badgeHtml(r.decision) +
+      '</div>';
+  }
+
+  // Build the review form
+  html += '<form id="daily-review-submit-form" onsubmit="submitDailyReview(event)">' +
+    '<input type="hidden" name="productId" value="' + escapeHtml(productId) + '">';
+
+  html += buildRatingInput('layout', 'Layout Quality');
+  html += buildRatingInput('typography', 'Typography');
+  html += buildRatingInput('colorAesthetic', 'Color / Aesthetic Match');
+  html += buildRatingInput('differentiation', 'Differentiation from Competitors');
+  html += buildRatingInput('sellability', 'Overall Sellability');
+
+  html += '<div class="form-group">' +
+    '<label class="form-label">Problem Source</label>' +
+    '<select name="problemSource" class="form-select" required>' +
+    '<option value="">Select...</option>' +
+    '<option value="design">Design</option>' +
+    '<option value="spec">Spec</option>' +
+    '<option value="research">Research</option>' +
+    '</select></div>';
+
+  html += '<div class="form-group">' +
+    '<label class="form-label">Decision</label>' +
+    '<div class="rating-input">' +
+    '<label style="width:auto;padding:0 12px;"><input type="radio" name="decision" value="approve"><span>Approve</span></label>' +
+    '<label style="width:auto;padding:0 12px;"><input type="radio" name="decision" value="revise"><span>Revise</span></label>' +
+    '<label style="width:auto;padding:0 12px;"><input type="radio" name="decision" value="reject"><span>Reject</span></label>' +
+    '</div></div>';
+
+  html += '<div class="form-group">' +
+    '<label class="form-label">Specific Issues</label>' +
+    '<textarea name="issues" class="form-textarea" placeholder="Describe any specific issues..."></textarea>' +
+    '</div>';
+
+  html += '<button type="submit" class="btn btn-primary">Submit Daily Review</button>';
+  html += '</form>';
+
+  container.innerHTML = html;
+}
+
+async function submitDailyReview(event) {
+  event.preventDefault();
+
+  var form = document.getElementById('daily-review-submit-form');
+  var formData = new FormData(form);
+  var productId = formData.get('productId');
+
+  var body = {
+    layout: parseInt(formData.get('layout'), 10),
+    typography: parseInt(formData.get('typography'), 10),
+    colorAesthetic: parseInt(formData.get('colorAesthetic'), 10),
+    differentiation: parseInt(formData.get('differentiation'), 10),
+    sellability: parseInt(formData.get('sellability'), 10),
+    issues: formData.get('issues') || '',
+    problemSource: formData.get('problemSource'),
+    decision: formData.get('decision'),
+  };
+
+  // Validate ratings
+  if (!body.layout || !body.typography || !body.colorAesthetic ||
+      !body.differentiation || !body.sellability) {
+    showToast('Please fill in all rating fields (1-5)', 'error');
+    return;
+  }
+
+  if (!body.problemSource) {
+    showToast('Please select a problem source', 'error');
+    return;
+  }
+
+  if (!body.decision) {
+    showToast('Please select a decision (approve/reject/revise)', 'error');
+    return;
+  }
+
+  var result = await apiPost('/api/review/daily/' + encodeURIComponent(productId), body);
+  if (result && result.success) {
+    showToast('Daily review submitted successfully', 'success');
+    await loadFeedbackHistory();
+  } else {
+    showToast('Failed to submit daily review', 'error');
+  }
+}
+
+async function loadWeeklyBatch() {
+  var container = document.getElementById('weekly-batch-container');
+  container.innerHTML = '<div class="loading">Loading weekly batch...</div>';
+
+  var data = await apiFetch('/api/review/weekly');
+  if (!data || !data.batch) {
+    container.innerHTML = '<div class="empty-state"><p>Failed to load weekly batch.</p></div>';
+    return;
+  }
+
+  var batch = data.batch;
+
+  if (!batch.products || !batch.products.length) {
+    container.innerHTML = '<div class="empty-state"><p>No products to review this week.</p></div>';
+    return;
+  }
+
+  var html = '<div style="margin-bottom: var(--spacing-md); padding: var(--spacing-sm); background: var(--color-surface-alt); border-radius: var(--radius-sm); font-size: 0.875rem;">' +
+    'Week: ' + formatDateShort(batch.weekStart) + ' &mdash; ' + formatDateShort(batch.weekEnd) +
+    ' | ' + batch.totalCount + ' product(s)' +
+    '</div>';
+
+  html += '<form id="weekly-review-submit-form" onsubmit="submitWeeklyReview(event)">';
+
+  batch.products.forEach(function (p, idx) {
+    var title = (p.brief && p.brief.title) ? escapeHtml(p.brief.title) : escapeHtml(p.id);
+    var niche = (p.brief && p.brief.niche) ? escapeHtml(p.brief.niche) : '--';
+
+    html += '<div class="card" style="margin-bottom: var(--spacing-md); border: 1px solid var(--color-border);">' +
+      '<div class="card-header">' +
+      '<span class="card-title">' + title + '</span>' +
+      '<span>' + niche + '</span>' +
+      '</div>' +
+      '<input type="hidden" name="product-' + idx + '-id" value="' + escapeHtml(p.id) + '">';
+
+    // Show existing scores if available
+    if (p.scores) {
+      html += '<div class="score-summary" style="margin-bottom: var(--spacing-md);">' +
+        '<div class="score-item"><span class="score-value">' + (p.scores.layout || 0) + '</span><span class="score-label">Layout</span></div>' +
+        '<div class="score-item"><span class="score-value">' + (p.scores.typography || 0) + '</span><span class="score-label">Typography</span></div>' +
+        '<div class="score-item"><span class="score-value">' + (p.scores.color || 0) + '</span><span class="score-label">Color</span></div>' +
+        '<div class="score-item"><span class="score-value">' + (p.scores.differentiation || 0) + '</span><span class="score-label">Differentiation</span></div>' +
+        '<div class="score-item"><span class="score-value">' + (p.scores.sellability || 0) + '</span><span class="score-label">Sellability</span></div>' +
+        '</div>';
+    }
+
+    html += '<div class="form-group">' +
+      '<label class="form-label">Detailed Notes</label>' +
+      '<textarea name="product-' + idx + '-detailedNotes" class="form-textarea" placeholder="Page-level details, design notes..."></textarea>' +
+      '</div>';
+
+    html += '<div class="form-group">' +
+      '<label class="form-label">Comparison Notes</label>' +
+      '<textarea name="product-' + idx + '-comparisonNotes" class="form-textarea" placeholder="How does this compare to reference designs / top sellers?"></textarea>' +
+      '</div>';
+
+    html += '<div class="form-group">' +
+      '<label class="form-label">Instruction Suggestions</label>' +
+      '<textarea name="product-' + idx + '-instructionSuggestions" class="form-textarea" placeholder="Suggestions for improving agent instructions..."></textarea>' +
+      '</div>';
+
+    html += '</div>';
+  });
+
+  html += '<input type="hidden" name="productCount" value="' + batch.products.length + '">';
+  html += '<button type="submit" class="btn btn-primary">Submit All Weekly Reviews</button>';
+  html += '</form>';
+
+  container.innerHTML = html;
+}
+
+async function submitWeeklyReview(event) {
+  event.preventDefault();
+
+  var form = document.getElementById('weekly-review-submit-form');
+  var formData = new FormData(form);
+  var count = parseInt(formData.get('productCount'), 10);
+
+  var reviews = [];
+  for (var i = 0; i < count; i++) {
+    var productId = formData.get('product-' + i + '-id');
+    var detailedNotes = formData.get('product-' + i + '-detailedNotes') || '';
+    var comparisonNotes = formData.get('product-' + i + '-comparisonNotes') || '';
+    var instructionSuggestions = formData.get('product-' + i + '-instructionSuggestions') || '';
+
+    reviews.push({
+      productId: productId,
+      pageAnnotations: [],
+      detailedNotes: detailedNotes,
+      comparisonNotes: comparisonNotes,
+      instructionSuggestions: instructionSuggestions,
+    });
+  }
+
+  if (!reviews.length) {
+    showToast('No reviews to submit', 'error');
+    return;
+  }
+
+  var result = await apiPost('/api/review/weekly', reviews);
+  if (result && result.success) {
+    showToast('Weekly reviews submitted (' + result.count + ' products)', 'success');
+    await loadFeedbackHistory();
+  } else {
+    showToast('Failed to submit weekly reviews', 'error');
+  }
+}
+
+async function loadFeedbackHistory() {
+  var results = await Promise.all([
+    apiFetch('/api/feedback/daily'),
+    apiFetch('/api/feedback/weekly'),
+  ]);
+
+  var dailyData = results[0];
+  var weeklyData = results[1];
+
+  // Render daily feedback history
+  var dailyTbody = document.getElementById('feedback-daily-history');
+  if (dailyTbody) {
+    if (dailyData && dailyData.records && dailyData.records.length) {
+      var dailyRows = dailyData.records.slice(0, 20).map(function (r) {
+        var filename = r.filename || '';
+        var datePart = filename.split('-').slice(0, 3).join('-') || formatDateShort(r.submittedAt) || '--';
+        var pidPart = r.productId || filename.replace(/^\d{4}-\d{2}-\d{2}-/, '').replace(/\.json$/, '') || '--';
+        return '<tr>' +
+          '<td>' + escapeHtml(datePart) + '</td>' +
+          '<td><code>' + escapeHtml(pidPart) + '</code></td>' +
+          '<td>' + (r.layout || r.layoutQuality || '--') + '</td>' +
+          '<td>' + (r.typography || '--') + '</td>' +
+          '<td>' + (r.colorAesthetic || r.colorAestheticMatch || r.color || '--') + '</td>' +
+          '<td>' + (r.differentiation || '--') + '</td>' +
+          '<td>' + (r.sellability || r.overallSellability || '--') + '</td>' +
+          '<td>' + badgeHtml(r.decision || '--') + '</td>' +
+          '</tr>';
+      }).join('');
+      dailyTbody.innerHTML = dailyRows;
+    } else {
+      dailyTbody.innerHTML = '<tr><td colspan="8" class="empty-state"><p>No daily reviews recorded yet.</p></td></tr>';
+    }
+  }
+
+  // Render weekly feedback history
+  var weeklyTbody = document.getElementById('feedback-weekly-history');
+  if (weeklyTbody) {
+    if (weeklyData && weeklyData.records && weeklyData.records.length) {
+      var weeklyRows = weeklyData.records.slice(0, 10).map(function (r) {
+        var submitted = r.submittedAt ? formatDate(r.submittedAt) : '--';
+        var weekRange = '';
+        if (r.weekStart && r.weekEnd) {
+          weekRange = formatDateShort(r.weekStart) + ' - ' + formatDateShort(r.weekEnd);
+        }
+        var reviewCount = (r.reviews && Array.isArray(r.reviews)) ? r.reviews.length : 0;
+        return '<tr>' +
+          '<td>' + submitted + '</td>' +
+          '<td>' + escapeHtml(weekRange) + '</td>' +
+          '<td>' + reviewCount + '</td>' +
+          '</tr>';
+      }).join('');
+      weeklyTbody.innerHTML = weeklyRows;
+    } else {
+      weeklyTbody.innerHTML = '<tr><td colspan="3" class="empty-state"><p>No weekly reviews recorded yet.</p></td></tr>';
+    }
+  }
 }
 
 // ── Navigation / Routing ─────────────────────────────────────────────
@@ -444,17 +1020,14 @@ async function loadActivity() {
 function switchView(viewName) {
   currentView = viewName;
 
-  // Update nav links
   document.querySelectorAll('.nav-links a').forEach(function (a) {
     a.classList.toggle('active', a.getAttribute('data-view') === viewName);
   });
 
-  // Show/hide views
   document.querySelectorAll('.view-section').forEach(function (section) {
     section.classList.toggle('active', section.id === 'view-' + viewName);
   });
 
-  // Load data for the view
   loadViewData(viewName);
 }
 
@@ -468,6 +1041,9 @@ async function loadViewData(viewName) {
       break;
     case 'approvals':
       await loadApprovals();
+      break;
+    case 'reviews':
+      await loadReviews();
       break;
     case 'niches':
       await loadNiches();
@@ -506,7 +1082,7 @@ function toggleTheme() {
 
 function updateThemeButton(theme) {
   var btn = document.getElementById('theme-toggle');
-  btn.textContent = theme === 'dark' ? 'Light Mode' : 'Dark Mode';
+  if (btn) btn.textContent = theme === 'dark' ? 'Light Mode' : 'Dark Mode';
 }
 
 // ── Auto-refresh ─────────────────────────────────────────────────────
@@ -530,10 +1106,9 @@ function stopAutoRefresh() {
 function init() {
   initTheme();
 
-  // Theme toggle
-  document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+  var themeBtn = document.getElementById('theme-toggle');
+  if (themeBtn) themeBtn.addEventListener('click', toggleTheme);
 
-  // Navigation
   document.querySelectorAll('.nav-links a').forEach(function (a) {
     a.addEventListener('click', function (e) {
       e.preventDefault();
@@ -544,7 +1119,6 @@ function init() {
 
   window.addEventListener('hashchange', handleHashChange);
 
-  // Initial load
   handleHashChange();
   startAutoRefresh();
 }
@@ -552,5 +1126,10 @@ function init() {
 // Make functions available globally for inline onclick handlers
 window.submitApproval = submitApproval;
 window.submitFeedback = submitFeedback;
+window.loadDailyReviewForm = loadDailyReviewForm;
+window.submitDailyReview = submitDailyReview;
+window.loadWeeklyBatch = loadWeeklyBatch;
+window.submitWeeklyReview = submitWeeklyReview;
+window.loadFeedbackHistory = loadFeedbackHistory;
 
 document.addEventListener('DOMContentLoaded', init);

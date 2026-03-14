@@ -1,22 +1,19 @@
 # PrintPilot — Master Project File
 
 ## System Overview
-PrintPilot is a fully automated digital product business engine. It researches trending niches using eRank (keyword search volume, competition scores, trend data) and Apify (live Etsy listing data, competitor shop analysis, bestseller scraping), designs printable PDF products (planners, trackers, journals, worksheets) via an HTML→PDF pipeline, scores each product against market data, surfaces them for human visual approval, publishes approved listings to Etsy via the official API, and drives multi-channel marketing on a staggered schedule. A weekly feedback synthesis loop auto-updates agent instructions based on your design reviews, compounding quality over time. The system runs daily on a cron schedule, indefinitely, with minimal human input beyond the approval gate.
+PrintPilot is a fully automated digital product business engine. It researches trending niches on Etsy using Firecrawl for live listing scraping and pytrends for Google Trends keyword/trend data, designs printable PDF products (planners, trackers, journals, worksheets) via an HTML→PDF pipeline, scores each product against market data, surfaces them for human visual approval, publishes approved listings to Etsy, and drives multi-channel marketing on a staggered schedule. A weekly feedback synthesis loop auto-updates agent instructions based on your design reviews, compounding quality over time. The system runs daily on a cron schedule, indefinitely, with minimal human input beyond the approval gate.
 
 ### Research Stack
-- **eRank Pro** ($9.99/mo) — keyword search volume, competition scores, CTR rates, trend data, estimated sales velocity. Data derived from aggregated seller behaviour via official Etsy API access. Tells us what's being searched and what's selling.
-- **Firecrawl Hobby** ($16/mo) — AI-native web scraper via CLI skill + MCP. Native Claude Code integration (one command install). Agent command handles natural language research queries across Etsy, Pinterest, Google Trends, and any other site. 1 credit per page, transparent pricing, no hidden multipliers. Tells us what's listed and how it looks — and can scrape anything else in the pipeline.
-- **Google Trends** (free) — macro trend signals to catch rising niches early.
-- **Alura API** (waitlist) — when available, will supplement or replace eRank with richer data. Join waitlist at alura.io/api.
+- **Firecrawl Hobby** ($16/mo) — AI-native web scraper via CLI skill + MCP. Native Claude Code integration (one command install). Agent command handles natural language research queries across Etsy, Pinterest, Google Trends, and any other site. 1 credit per page, transparent pricing, no hidden multipliers. Handles all listing scraping, competitor analysis, and reference library population.
+- **pytrends / Google Trends** (free) — macro trend signals, keyword interest over time, related queries. Used to catch rising niches early and validate keyword demand.
 
 ### Monthly Operating Cost
 | Service | Cost |
 |---------|------|
 | Claude API | ~$15-20 |
-| eRank Pro | $9.99 |
 | Firecrawl Hobby | $16 |
 | Etsy listing fees ($0.20 × ~60 listings) | ~$12 |
-| **Total** | **~$53-58/mo** |
+| **Total** | **~$43-48/mo** |
 
 ---
 
@@ -42,7 +39,7 @@ This file is the root orchestrator. On session start:
 ### Daily Run Sequence
 ```
 06:00  @orchestrator wakes, checks queue
-06:05  @researcher runs — eRank keyword data + Apify listing scrape + Google Trends
+06:05  @researcher runs — Firecrawl-based Etsy + Pinterest scraping, pytrends for Google Trends data
 07:00  @strategist runs — scores opportunities, picks top 1-3, generates product briefs
 07:30  @designer runs — generates HTML/CSS, Puppeteer renders to PDF
 08:30  @copywriter runs — writes Etsy title, description, 13 tags per product
@@ -74,7 +71,7 @@ All agents live in `.claude/agents/` and are shared across the project.
 | Agent | Role |
 |-------|------|
 | `@orchestrator` | Drives daily + weekly schedules, manages state, routes between agents, sends notifications |
-| `@researcher` | Queries eRank for keyword/trend data + Firecrawl agent for live listing/competitor research + Google Trends. Builds ranked opportunity queue. |
+| `@researcher` | Firecrawl-based Etsy/Pinterest scraping, pytrends for trend/keyword data, builds opportunity queue |
 | `@strategist` | Scores opportunities, selects top picks, generates structured product briefs |
 | `@designer` | Generates HTML/CSS templates per brief, invokes Puppeteer to render multi-page PDFs |
 | `@copywriter` | Writes SEO-optimized Etsy titles, descriptions, tags, and marketing copy per product |
@@ -114,11 +111,7 @@ printpilot/
 │   ├── pipeline/                    ← pipeline orchestration
 │   │   ├── production.ts            ← research → design → approve → publish
 │   │   └── marketing.ts             ← staggered marketing rollout
-│   ├── research/                    ← research integrations
-│   │   ├── erank.ts                 ← eRank API client (keywords, trends, competition)
-│   │   ├── firecrawl.ts             ← Firecrawl client (listing scraping, agent queries)
-│   │   ├── google-trends.ts         ← Google Trends client
-│   │   └── alura.ts                 ← Alura API client (stub, ready for when API opens)
+│   ├── research/                    ← Firecrawl scraping + pytrends trend analysis
 │   ├── renderer/                    ← HTML→PDF rendering via Puppeteer
 │   │   ├── render.ts
 │   │   ├── templates/               ← base HTML/CSS design templates
@@ -181,14 +174,7 @@ printpilot/
     "researcher": {
       "maxOpportunitiesPerRun": 10,
       "minReviewCount": 50,
-      "targetPriceRange": [3, 25],
-      "erankPlan": "pro",
-      "firecrawl": {
-        "plan": "hobby",
-        "maxCreditsPerRun": 200,
-        "agentEnabled": true
-      },
-      "aluraApiEnabled": false
+      "targetPriceRange": [3, 25]
     },
     "marketing": {
       "pinsPerProduct": 3,
@@ -303,42 +289,36 @@ All shared keys in `.env` at project root. See `.env.example` for required vars.
 ### .env.example
 ```
 # Anthropic
-ANTHROPIC_API_KEY=
+ANTHROPIC_API_KEY=TBD
 
 # Etsy
-ETSY_API_KEY=
-ETSY_API_SECRET=
-ETSY_SHOP_ID=
+ETSY_API_KEY=TBD
+ETSY_API_SECRET=TBD
+ETSY_SHOP_ID=TBD
 
-# Research — eRank
-ERANK_API_KEY=
-ERANK_PLAN=pro
-
-# Research — Firecrawl
-FIRECRAWL_API_KEY=
-
-# Research — Alura (when API becomes available)
-ALURA_API_KEY=
+# Research (Firecrawl handles all web scraping — Etsy listings, Pinterest, reference library)
+FIRECRAWL_API_KEY=TBD
 
 # Pinterest
-PINTEREST_ACCESS_TOKEN=
+PINTEREST_ACCESS_TOKEN=TBD
 
 # Email (e.g. Resend, Mailchimp, ConvertKit)
-EMAIL_PROVIDER=
-EMAIL_API_KEY=
-EMAIL_LIST_ID=
+EMAIL_PROVIDER=TBD
+EMAIL_API_KEY=TBD
+EMAIL_LIST_ID=TBD
 
 # Blog (e.g. WordPress, Ghost)
-BLOG_API_URL=
-BLOG_API_KEY=
+BLOG_PLATFORM=TBD
+BLOG_API_URL=TBD
+BLOG_API_KEY=TBD
 
 # Notifications
-TELEGRAM_BOT_TOKEN=
-TELEGRAM_CHAT_ID=
+TELEGRAM_BOT_TOKEN=TBD
+TELEGRAM_CHAT_ID=TBD
 
 # Dashboard
 DASHBOARD_PORT=3000
-DASHBOARD_SECRET=
+DASHBOARD_SECRET=TBD
 ```
 
 ### Shared Utilities
@@ -372,14 +352,29 @@ shared/
 
 ---
 
+## Monthly Cost Estimate
+
+| Service | Cost |
+|---------|------|
+| Anthropic API (Claude) | ~$20-25/mo |
+| Firecrawl (research + references) | ~$15/mo |
+| Etsy listing fees ($0.20 × ~60 listings) | ~$12 |
+| Etsy API | Free |
+| Pinterest API | Free |
+| Google Trends (pytrends) | Free |
+| Telegram Bot API | Free |
+| **Total** | **~$43-48/mo** |
+
+Note: Costs scale with usage. Anthropic estimate assumes ~2 products/day with AI-powered design, copy, and scoring. Firecrawl estimate based on daily research scraping + weekly reference library updates.
+
+---
+
 ## Initialization Checklist
 - [ ] Clone repo and run `npm install`
 - [ ] Copy `.env.example` → `.env` and fill in all values
 - [ ] Set up Etsy OAuth credentials via Developer Portal
 - [ ] Set up Pinterest OAuth credentials
-- [ ] Sign up for eRank Pro and add API key
-- [ ] Sign up for Firecrawl and add API key — run `npx -y firecrawl-cli@latest init --all --browser` in Claude Code to install skill
-- [ ] Join Alura API waitlist at alura.io/api (future upgrade)
+- [ ] Sign up for Firecrawl and add API key
 - [ ] Configure Telegram bot and get chat ID
 - [ ] Configure email provider and list ID
 - [ ] Configure blog API (WordPress/Ghost)

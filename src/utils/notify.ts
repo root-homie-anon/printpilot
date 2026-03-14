@@ -186,20 +186,17 @@ export async function sendDailySummary(results: PipelineResult): Promise<void> {
 export async function sendWeeklySummary(synthesisResult: SynthesisResult): Promise<void> {
   try {
     const ts = escapeMarkdownV2(timestamp());
-    const agentsList = synthesisResult.agentsUpdated.length > 0
-      ? synthesisResult.agentsUpdated.map((a) => `  \\- ${escapeMarkdownV2(a)}`).join('\n')
+    const agentsList = synthesisResult.agentsAffected.length > 0
+      ? synthesisResult.agentsAffected.map((a) => `  \\- ${escapeMarkdownV2(a)}`).join('\n')
       : '  None';
 
     const message = [
       `*Weekly Synthesis Summary*`,
       ``,
-      `*Updates Applied:* ${synthesisResult.updatesApplied}`,
-      `*Patterns Extracted:* ${synthesisResult.patternsExtracted}`,
-      `*Agents Updated:*`,
+      `*Instructions Updated:* ${synthesisResult.instructionsUpdated}`,
+      `*Patterns Found:* ${synthesisResult.patternsFound}`,
+      `*Agents Affected:*`,
       agentsList,
-      ``,
-      `*Changelog Entries:*`,
-      ...synthesisResult.changelogEntries.map((e) => `  \\- ${escapeMarkdownV2(e)}`),
       ``,
       `${ts}`,
     ].join('\n');

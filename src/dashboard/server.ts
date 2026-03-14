@@ -4,6 +4,10 @@ import { resolve, join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { logger } from '../utils/logger.js';
 import { loadConfig } from '../utils/config.js';
+import { getDailyReviewForm, submitDailyReview } from '../feedback/daily-form.js';
+import type { DailyReview, ReviewFormData } from '../feedback/daily-form.js';
+import { getWeeklyBatch, submitWeeklyReview } from '../feedback/weekly-review.js';
+import type { WeeklyReviewItem, WeeklyBatchData } from '../feedback/weekly-review.js';
 import type {
   ListingData,
   MarketingPlan,
@@ -495,6 +499,159 @@ async function handlePostFeedback(req: Request, res: Response): Promise<void> {
   }
 }
 
+// ── Review Route Handlers ────────────────────────────────────────────
+
+async function handleGetDailyReview(req: Request, res: Response): Promise<void> {
+  try {
+    const rawId = req.params.productId;
+    const productId = Array.isArray(rawId) ? rawId[0] : rawId;
+    if (!productId) {
+      res.status(400).json({ error: 'Product ID is required' });
+      return;
+    }
+
+    const formData = await getDailyReviewForm(productId);
+    res.json({ formData });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    logger.error(`Failed to load daily review form: ${message}`);
+    const status = message.includes('not found') ? 404 : 500;
+    res.status(status).json({ error: message });
+  }
+}
+
+async function handlePostDailyReview(req: Request, res: Response): Promise<void> {
+  try {
+    const rawId = req.params.productId;
+    const productId = Array.isArray(rawId) ? rawId[0] : rawId;
+    if (!productId) {
+      res.status(400).json({ error: 'Product ID is required' });
+      return;
+    }
+
+    const review = req.body as DailyReview;
+    await submitDailyReview(productId, review);
+
+    logger.info(`Daily review submitted for product ${productId}`);
+    res.json({ success: true, productId });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    logger.error(`Failed to submit daily review: ${message}`);
+    res.status(400).json({ error: message });
+  }
+}
+
+async function handleGetWeeklyBatch(_req: Request, res: Response): Promise<void> {
+  try {
+    const batch = await getWeeklyBatch();
+    res.json({ batch });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    logger.error(`Failed to load weekly batch: ${message}`);
+    res.status(500).json({ error: 'Failed to load weekly batch' });
+  }
+}
+
+async function handlePostWeeklyReview(req: Request, res: Response): Promise<void> {
+  try {
+    const reviews = req.body as WeeklyReviewItem[];
+    await submitWeeklyReview(reviews);
+
+    logger.info(`Weekly review submitted: ${reviews.length} products`);
+    res.json({ success: true, count: reviews.length });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    logger.error(`Failed to submit weekly review: ${message}`);
+    res.status(400).json({ error: message });
+  }
+}
+
+async function handleGetFeedbackDaily(_req: Request, res: Response): Promise<void> {
+  try {
+    const dailyDir = resolve(FEEDBACK_DIR, 'daily');
+    const files = await listJsonFiles(dailyDir);
+    const records: Record<string, unknown>[] = [];
+
+    for (const file of files) {
+      const record = await readJsonFile<Record<string, unknown>>(join(dailyDir, file));
+      if (record) {
+        records.push({ ...record, filename: file });
+      }
+    }
+
+    // Sort by filename descending (newest first)
+    records.sort((a, b) => {
+      const fa = a.filename as string;
+      const fb = b.filename as string;
+      return fb.localeCompare(fa);
+    });
+
+    res.json({ records });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    logger.error(`Failed to load daily feedback: ${message}`);
+    res.status(500).json({ error: 'Failed to load daily feedback records' });
+  }
+}
+
+async function handleGetFeedbackWeekly(_req: Request, res: Response): Promise<void> {
+  try {
+    const weeklyDir = resolve(FEEDBACK_DIR, 'weekly');
+    const files = await listJsonFiles(weeklyDir);
+    const records: Record<string, unknown>[] = [];
+
+    for (const file of files) {
+      const record = await readJsonFile<Record<string, unknown>>(join(weeklyDir, file));
+      if (record) {
+        records.push({ ...record, filename: file });
+      }
+    }
+
+    // Sort by filename descending (newest first)
+    records.sort((a, b) => {
+      const fa = a.filename as string;
+      const fb = b.filename as string;
+      return fb.localeCompare(fa);
+    });
+
+    res.json({ records });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    logger.error(`Failed to load weekly feedback: ${message}`);
+    res.status(500).json({ error: 'Failed to load weekly feedback records' });
+  }
+}
+
+async function handleGetFeedbackScores(req: Request, res: Response): Promise<void> {
+  try {
+    const rawId = req.params.productId;
+    const productId = Array.isArray(rawId) ? rawId[0] : rawId;
+    if (!productId) {
+      res.status(400).json({ error: 'Product ID is required' });
+      return;
+    }
+
+    const productDir = resolve(PRODUCTS_DIR, productId);
+    const scoreReport = await readJsonFile<Record<string, unknown>>(
+      join(productDir, 'score-report.json')
+    );
+    const scores = await readJsonFile<Record<string, unknown>>(
+      join(productDir, 'scores.json')
+    );
+
+    if (!scoreReport && !scores) {
+      res.status(404).json({ error: 'No score data found for this product' });
+      return;
+    }
+
+    res.json({ scoreReport, scores, productId });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    logger.error(`Failed to load feedback scores: ${message}`);
+    res.status(500).json({ error: 'Failed to load feedback scores' });
+  }
+}
+
 // ── Server Setup ─────────────────────────────────────────────────────
 
 export async function startDashboardServer(): Promise<void> {
@@ -531,6 +688,17 @@ export async function startDashboardServer(): Promise<void> {
   app.get('/api/activity', handleGetActivity);
   app.post('/api/approve/:id', handlePostApproval);
   app.post('/api/feedback/:id', handlePostFeedback);
+
+  // Review routes
+  app.get('/api/review/daily/:productId', handleGetDailyReview);
+  app.post('/api/review/daily/:productId', handlePostDailyReview);
+  app.get('/api/review/weekly', handleGetWeeklyBatch);
+  app.post('/api/review/weekly', handlePostWeeklyReview);
+
+  // Feedback listing routes
+  app.get('/api/feedback/daily', handleGetFeedbackDaily);
+  app.get('/api/feedback/weekly', handleGetFeedbackWeekly);
+  app.get('/api/feedback/scores/:productId', handleGetFeedbackScores);
 
   // Root route
   app.get('/', (_req: Request, res: Response) => {

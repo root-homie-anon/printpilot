@@ -21,6 +21,7 @@ const OPTIONAL_VARS = [
   'DASHBOARD_PORT',
   'DASHBOARD_SECRET',
   'LOG_LEVEL',
+  'FIRECRAWL_API_KEY',
 ] as const;
 
 type RequiredVar = (typeof REQUIRED_VARS)[number];

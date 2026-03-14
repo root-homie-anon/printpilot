@@ -14,6 +14,7 @@
       <a href="#dashboard" class="active" data-view="dashboard">Dashboard</a>
       <a href="#products" data-view="products">Products</a>
       <a href="#approvals" data-view="approvals">Approvals</a>
+      <a href="#reviews" data-view="reviews">Reviews</a>
       <a href="#niches" data-view="niches">Niches</a>
       <a href="#marketing" data-view="marketing">Marketing</a>
       <a href="#activity" data-view="activity">Activity</a>
@@ -102,7 +103,6 @@
           </div>
           <div class="chart-area">
             <canvas id="quality-chart"></canvas>
-            <span>Chart.js integration placeholder</span>
           </div>
         </div>
 
@@ -179,6 +179,79 @@
       <div id="pending-approvals"></div>
       <div class="empty-state" id="no-approvals" style="display: none;">
         <p>No products pending approval.</p>
+      </div>
+    </section>
+
+    <!-- ── Reviews View ──────────────────────────────────────────── -->
+    <section id="view-reviews" class="view-section">
+      <div class="dashboard-grid">
+
+        <!-- Daily Review Form -->
+        <div class="card full-width">
+          <div class="card-header">
+            <span class="card-title">Daily Review Form</span>
+          </div>
+          <div class="form-group" style="display: flex; gap: var(--spacing-sm); align-items: flex-end;">
+            <div style="flex: 1;">
+              <label class="form-label" for="daily-review-product-id">Product ID</label>
+              <input type="text" id="daily-review-product-id" class="form-input" placeholder="Enter product ID...">
+            </div>
+            <button class="btn btn-primary" onclick="loadDailyReviewForm()">Load Product</button>
+          </div>
+          <div id="daily-review-form-container"></div>
+        </div>
+
+        <!-- Weekly Review Batch -->
+        <div class="card full-width">
+          <div class="card-header">
+            <span class="card-title">Weekly Review Batch</span>
+          </div>
+          <div style="margin-bottom: var(--spacing-md);">
+            <button class="btn btn-primary" onclick="loadWeeklyBatch()">Load This Week's Batch</button>
+          </div>
+          <div id="weekly-batch-container"></div>
+        </div>
+
+        <!-- Feedback History -->
+        <div class="card full-width">
+          <div class="card-header">
+            <span class="card-title">Feedback History</span>
+          </div>
+
+          <h4 style="margin-bottom: var(--spacing-sm); font-size: 0.875rem; font-weight: 600; color: var(--color-text-muted);">Daily Reviews</h4>
+          <div class="table-wrapper" style="margin-bottom: var(--spacing-lg);">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Product ID</th>
+                  <th>Layout</th>
+                  <th>Typo</th>
+                  <th>Color</th>
+                  <th>Diff</th>
+                  <th>Sell</th>
+                  <th>Decision</th>
+                </tr>
+              </thead>
+              <tbody id="feedback-daily-history"></tbody>
+            </table>
+          </div>
+
+          <h4 style="margin-bottom: var(--spacing-sm); font-size: 0.875rem; font-weight: 600; color: var(--color-text-muted);">Weekly Reviews</h4>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Week</th>
+                  <th>Products Reviewed</th>
+                </tr>
+              </thead>
+              <tbody id="feedback-weekly-history"></tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
     </section>
 

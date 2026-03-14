@@ -9,7 +9,7 @@ import {
   type Pattern,
   type InstructionDiff,
 } from './pattern-extractor.js';
-import type { FeedbackSource } from '../types/index.js';
+import type { FeedbackSource, SynthesisResult } from '../types/index.js';
 
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -24,12 +24,6 @@ const STATE_DIR = resolve(process.cwd(), 'state');
 const PRODUCTS_DIR = resolve(STATE_DIR, 'products');
 
 // ── Types ────────────────────────────────────────────────────────────
-
-export interface SynthesisResult {
-  patternsFound: number;
-  instructionsUpdated: number;
-  agentsAffected: string[];
-}
 
 interface DailyFeedbackFile {
   productId: string;
