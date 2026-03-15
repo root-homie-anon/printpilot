@@ -20,14 +20,14 @@ import type {
 
 // ── Constants ────────────────────────────────────────────────────────
 
-const DEFAULT_PORT = 3000;
+const DEFAULT_PORT = 3737;
 const STATE_DIR = resolve(process.cwd(), 'state');
 const PRODUCTS_DIR = resolve(STATE_DIR, 'products');
 const LISTINGS_DIR = resolve(STATE_DIR, 'listings');
 const MARKETING_DIR = resolve(STATE_DIR, 'marketing');
 const ACTIVITY_LOG_PATH = resolve(STATE_DIR, 'logs', 'activity.json');
 const FEEDBACK_DIR = resolve(process.cwd(), 'feedback');
-const PUBLIC_DIR = resolve(import.meta.dirname, 'public');
+const PUBLIC_DIR = resolve(new URL('.', import.meta.url).pathname, 'public');
 
 // ── Types ────────────────────────────────────────────────────────────
 
