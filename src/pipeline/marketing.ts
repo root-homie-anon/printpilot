@@ -3,6 +3,13 @@ import { resolve } from 'node:path';
 import type { ListingData, MarketingPlan } from '../types/index.js';
 import { runAgent } from '../agents/runner.js';
 import { loadConfig } from '../utils/config.js';
+import { isolate } from '../utils/resilience.js';
+import { PostPurchaseEngine } from '../marketing/post-purchase.js';
+import { PromotionsEngine } from '../marketing/promotions.js';
+import { ListingOptimizer } from '../marketing/listing-optimizer.js';
+import { BundleEngine } from '../marketing/bundles.js';
+import { SocialProofEngine } from '../marketing/social-proof.js';
+import { CampaignCalendar } from '../marketing/campaign-calendar.js';
 import logger from '../utils/logger.js';
 
 export interface MarketingResult {
@@ -150,7 +157,7 @@ export async function runMarketingPipeline(): Promise<MarketingResult> {
     }
 
     // ── Pinterest ─────────────────────────────────────────
-    if (!plan.pinterest.completedAt) {
+    if (config.agents.marketing.pinterestEnabled && !plan.pinterest.completedAt) {
       const publishedDays = daysSince(listing.publishedAt);
       if (publishedDays >= config.pipeline.pinterestDelayDays) {
         try {
@@ -251,6 +258,69 @@ export async function runMarketingPipeline(): Promise<MarketingResult> {
     }
 
     await saveMarketingPlan(productId, plan);
+  }
+
+  // ── Cross-cutting marketing tasks (each isolated) ────────────
+  logger.info('Running daily marketing automation tasks');
+
+  const postPurchaseResult = await isolate('post-purchase', async () => {
+    const engine = new PostPurchaseEngine();
+    const seqResult = await engine.processQueue();
+    logger.info(`Post-purchase: ${seqResult.sent} sent, ${seqResult.failed} failed`);
+    return seqResult;
+  });
+  if (!postPurchaseResult.success) {
+    result.errors.push(`post-purchase: ${postPurchaseResult.error}`);
+  }
+
+  const promotionsResult = await isolate('promotions', async () => {
+    const engine = new PromotionsEngine();
+    await engine.checkAndLaunchCampaigns();
+    logger.info('Promotions: checked and launched due campaigns');
+  });
+  if (!promotionsResult.success) {
+    result.errors.push(`promotions: ${promotionsResult.error}`);
+  }
+
+  const optimizerResult = await isolate('listing-optimizer', async () => {
+    const optimizer = await ListingOptimizer.create();
+    const optResult = await optimizer.runOptimizationCycle();
+    logger.info(
+      `Optimizer: ${optResult.actionsApplied} actions applied, ` +
+      `${optResult.abTestsEvaluated} AB tests evaluated`
+    );
+    return optResult;
+  });
+  if (!optimizerResult.success) {
+    result.errors.push(`listing-optimizer: ${optimizerResult.error}`);
+  }
+
+  const bundlesResult = await isolate('bundles', async () => {
+    const engine = new BundleEngine();
+    await engine.refreshBundles();
+    logger.info('Bundles: refreshed');
+  });
+  if (!bundlesResult.success) {
+    result.errors.push(`bundles: ${bundlesResult.error}`);
+  }
+
+  const socialProofResult = await isolate('social-proof', async () => {
+    const engine = new SocialProofEngine();
+    await engine.runSocialProofCycle();
+    logger.info('Social proof: cycle complete');
+  });
+  if (!socialProofResult.success) {
+    result.errors.push(`social-proof: ${socialProofResult.error}`);
+  }
+
+  const calendarResult = await isolate('campaign-calendar', async () => {
+    const calendar = new CampaignCalendar();
+    const actions = await calendar.executeDueActions();
+    logger.info(`Campaign calendar: ${actions.length} actions executed`);
+    return actions;
+  });
+  if (!calendarResult.success) {
+    result.errors.push(`campaign-calendar: ${calendarResult.error}`);
   }
 
   logger.info(

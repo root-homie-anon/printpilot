@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
-import type { AgentResult, ProductBrief, ProductScores } from '../types/index.js';
+import type { AgentResult, ProductBrief, ProductScores, ScoreReport } from '../types/index.js';
 import logger from '../utils/logger.js';
 import { callClaude } from '../utils/claude.js';
 import { logActivity } from '../tracker/activity-log.js';
@@ -8,13 +8,6 @@ import type { CopyResult } from './copywriter.js';
 
 const STATE_DIR = resolve(process.cwd(), 'state');
 const PRODUCTS_DIR = join(STATE_DIR, 'products');
-
-export interface ScoreReport {
-  productId: string;
-  scores: Record<string, number>;
-  recommendation: string;
-  flags: string[];
-}
 
 interface DesignMeta {
   generationMethod?: string;

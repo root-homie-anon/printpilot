@@ -36,6 +36,7 @@ const ConfigSchema = z.object({
     }),
     marketing: z.object({
       pinsPerProduct: z.number().int().positive(),
+      pinterestEnabled: z.boolean(),
       emailEnabled: z.boolean(),
       blogEnabled: z.boolean(),
     }),
@@ -44,6 +45,9 @@ const ConfigSchema = z.object({
     channel: z.string(),
     approvalRequired: z.boolean(),
     weeklyReviewDay: z.string(),
+  }),
+  dashboard: z.object({
+    port: z.number().int().positive(),
   }),
   features: z.object({
     autoPublish: z.boolean(),

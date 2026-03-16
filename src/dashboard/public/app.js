@@ -416,6 +416,8 @@ async function loadApprovals() {
 
   var container = document.getElementById('pending-approvals');
   var emptyEl = document.getElementById('no-approvals');
+  var countEl = document.getElementById('approval-count');
+  if (countEl) countEl.textContent = pending.length;
 
   if (!pending.length) {
     container.innerHTML = '';
@@ -425,48 +427,146 @@ async function loadApprovals() {
 
   emptyEl.style.display = 'none';
 
-  var html = pending.map(function (p) {
-    var title = getProductTitle(p);
-    var niche = getProductNiche(p);
+  // Load full approval data for each pending product
+  var detailedHtml = [];
+  for (var i = 0; i < pending.length; i++) {
+    var p = pending[i];
+    var approvalData = await apiFetch('/api/approve/' + encodeURIComponent(p.id) + '/data');
+    detailedHtml.push(buildApprovalCard(p, approvalData));
+  }
 
-    var scoreHtml = '';
-    if (p.scores) {
-      var s = p.scores;
-      scoreHtml = '<div class="score-summary">' +
-        '<div class="score-item"><span class="score-value" style="color:' + scoreColor(s.layout) + '">' + s.layout + '</span><span class="score-label">Layout</span></div>' +
-        '<div class="score-item"><span class="score-value" style="color:' + scoreColor(s.typography) + '">' + s.typography + '</span><span class="score-label">Typography</span></div>' +
-        '<div class="score-item"><span class="score-value" style="color:' + scoreColor(s.color) + '">' + s.color + '</span><span class="score-label">Color</span></div>' +
-        '<div class="score-item"><span class="score-value" style="color:' + scoreColor(s.differentiation) + '">' + s.differentiation + '</span><span class="score-label">Differentiation</span></div>' +
-        '<div class="score-item"><span class="score-value" style="color:' + scoreColor(s.sellability) + '">' + s.sellability + '</span><span class="score-label">Sellability</span></div>' +
-        '</div>';
-    }
+  container.innerHTML = detailedHtml.join('');
+}
 
-    var briefHtml = '';
-    if (p.brief) {
-      briefHtml = '<div style="margin:12px 0;font-size:0.875rem;">' +
-        '<strong>Pages:</strong> ' + (p.brief.pageCount || '--') +
-        ' &middot; <strong>Audience:</strong> ' + escapeHtml(p.brief.targetAudience) +
-        ' &middot; <strong>Font:</strong> ' + escapeHtml(p.brief.styleGuide && p.brief.styleGuide.primaryFont) +
-        ' &middot; <strong>Palette:</strong> ' + escapeHtml(p.brief.styleGuide && p.brief.styleGuide.palette) +
-        '</div>';
-    }
+function buildApprovalCard(p, approvalData) {
+  var title = getProductTitle(p);
+  var niche = getProductNiche(p);
+  var ad = approvalData || {};
+  var revisionCount = (ad.approval && ad.approval.revisionCount) || 0;
 
-    return '<div class="card approval-card" style="margin-bottom: 16px;">' +
-      '<div class="card-header"><span class="card-title">Pending: ' + escapeHtml(title) + '</span><span>' + badgeHtml(niche) + '</span></div>' +
-      briefHtml +
-      scoreHtml +
-      '<div class="btn-group" style="margin-top:12px;">' +
-      '<button class="btn btn-success btn-sm" onclick="submitApproval(\'' + p.id + '\', \'approve\')">Approve</button>' +
-      '<button class="btn btn-outline btn-sm" onclick="submitApproval(\'' + p.id + '\', \'revise\')">Request Revision</button>' +
-      '<button class="btn btn-danger btn-sm" onclick="submitApproval(\'' + p.id + '\', \'reject\')">Reject</button>' +
-      '</div>' +
-      '<hr style="margin: 16px 0; border: none; border-top: 1px solid var(--color-border);">' +
-      '<h4 style="margin-bottom: 8px; font-size: 0.875rem;">Quick Feedback</h4>' +
-      buildFeedbackForm(p.id) +
+  // Header with revision badge
+  var revisionBadge = revisionCount > 0
+    ? ' <span class="badge badge-warning">Revision #' + revisionCount + '</span>'
+    : '';
+
+  var html = '<div class="card approval-card" style="margin-bottom: 20px;">';
+  html += '<div class="card-header">' +
+    '<span class="card-title">' + escapeHtml(title) + revisionBadge + '</span>' +
+    '<span>' + badgeHtml(niche) + '</span>' +
+    '</div>';
+
+  // Brief info
+  if (p.brief) {
+    html += '<div style="margin:8px 0 12px;font-size:0.875rem;color:var(--color-text-muted);">' +
+      '<strong>Pages:</strong> ' + (p.brief.pageCount || '--') +
+      ' &middot; <strong>Audience:</strong> ' + escapeHtml(p.brief.targetAudience || '--') +
+      ' &middot; <strong>Font:</strong> ' + escapeHtml((p.brief.styleGuide && p.brief.styleGuide.primaryFont) || '--') +
+      ' &middot; <strong>Palette:</strong> ' + escapeHtml((p.brief.styleGuide && p.brief.styleGuide.palette) || '--') +
       '</div>';
-  }).join('');
+  }
 
-  container.innerHTML = html;
+  // PDF Preview
+  if (ad.hasPdf) {
+    html += '<div style="margin:12px 0;">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
+      '<strong style="font-size:0.875rem;">PDF Preview</strong>' +
+      '<button class="btn btn-outline btn-sm" onclick="togglePdfPreview(\'' + p.id + '\')" id="pdf-toggle-' + p.id + '">Show Preview</button>' +
+      '<a href="/api/products/' + encodeURIComponent(p.id) + '/pdf" target="_blank" class="btn btn-outline btn-sm">Open in New Tab</a>' +
+      '</div>' +
+      '<div id="pdf-preview-' + p.id + '" style="display:none;">' +
+      '<iframe src="/api/products/' + encodeURIComponent(p.id) + '/pdf" ' +
+      'style="width:100%;height:600px;border:1px solid var(--color-border);border-radius:var(--radius-md);background:#fff;" ' +
+      'title="PDF Preview"></iframe>' +
+      '</div>' +
+      '</div>';
+  }
+
+  // Copy preview (title, description, tags)
+  if (ad.copy) {
+    html += '<div style="margin:12px 0;padding:12px;background:var(--color-surface-alt);border-radius:var(--radius-md);font-size:0.875rem;">' +
+      '<strong>Listing Title:</strong> ' + escapeHtml(ad.copy.title) + '<br>' +
+      '<strong>Description:</strong> <span style="color:var(--color-text-muted);">' +
+      escapeHtml((ad.copy.description || '').slice(0, 200)) +
+      (ad.copy.description && ad.copy.description.length > 200 ? '...' : '') + '</span><br>' +
+      '<strong>Tags:</strong> ' +
+      (ad.copy.tags || []).map(function (t) {
+        return '<span class="badge" style="margin:2px;font-size:0.75rem;">' + escapeHtml(t) + '</span>';
+      }).join('') +
+      '</div>';
+  }
+
+  // Scores
+  if (p.scores) {
+    var s = p.scores;
+    html += '<div class="score-summary">' +
+      '<div class="score-item"><span class="score-value" style="color:' + scoreColor(s.layout) + '">' + s.layout + '</span><span class="score-label">Layout</span></div>' +
+      '<div class="score-item"><span class="score-value" style="color:' + scoreColor(s.typography) + '">' + s.typography + '</span><span class="score-label">Typography</span></div>' +
+      '<div class="score-item"><span class="score-value" style="color:' + scoreColor(s.color) + '">' + s.color + '</span><span class="score-label">Color</span></div>' +
+      '<div class="score-item"><span class="score-value" style="color:' + scoreColor(s.differentiation) + '">' + s.differentiation + '</span><span class="score-label">Differentiation</span></div>' +
+      '<div class="score-item"><span class="score-value" style="color:' + scoreColor(s.sellability) + '">' + s.sellability + '</span><span class="score-label">Sellability</span></div>' +
+      '</div>';
+  }
+
+  // Comparison data if available
+  if (ad.comparison) {
+    var c = ad.comparison;
+    var alignColor = scoreColor(c.overallAlignment || 0);
+    html += '<div style="margin:12px 0;padding:8px 12px;background:var(--color-surface-alt);border-radius:var(--radius-md);font-size:0.875rem;">' +
+      '<strong>Reference Comparison:</strong> ' +
+      '<span style="color:' + alignColor + ';font-weight:600;">' + (c.overallAlignment || '--') + '/100</span> alignment' +
+      (c.readyToList ? ' &mdash; Ready to list' : ' &mdash; Needs improvement') +
+      '</div>';
+  }
+
+  // Integrated feedback + decision form
+  html += '<hr style="margin:16px 0;border:none;border-top:1px solid var(--color-border);">';
+  html += '<h4 style="margin-bottom:8px;font-size:0.9rem;font-weight:600;">Review & Decision</h4>';
+  html += buildApprovalForm(p.id);
+
+  html += '</div>';
+  return html;
+}
+
+function togglePdfPreview(productId) {
+  var preview = document.getElementById('pdf-preview-' + productId);
+  var toggle = document.getElementById('pdf-toggle-' + productId);
+  if (!preview) return;
+  var isHidden = preview.style.display === 'none';
+  preview.style.display = isHidden ? 'block' : 'none';
+  if (toggle) toggle.textContent = isHidden ? 'Hide Preview' : 'Show Preview';
+}
+
+function buildApprovalForm(productId) {
+  var html = '<form id="approval-form-' + productId + '" onsubmit="submitApprovalWithFeedback(event, \'' + productId + '\')">';
+
+  html += buildRatingInput('layout-' + productId, 'Layout Quality');
+  html += buildRatingInput('typography-' + productId, 'Typography');
+  html += buildRatingInput('color-' + productId, 'Color / Aesthetic Match');
+  html += buildRatingInput('differentiation-' + productId, 'Differentiation');
+  html += buildRatingInput('sellability-' + productId, 'Overall Sellability');
+
+  html += '<div class="form-group">' +
+    '<label class="form-label">Problem Source</label>' +
+    '<select name="source" class="form-select">' +
+    '<option value="">N/A</option>' +
+    '<option value="design">Design</option>' +
+    '<option value="spec">Spec</option>' +
+    '<option value="research">Research</option>' +
+    '</select></div>';
+
+  html += '<div class="form-group">' +
+    '<label class="form-label">Notes / Issues</label>' +
+    '<textarea name="issues" class="form-textarea" placeholder="Optional feedback for revision..."></textarea>' +
+    '</div>';
+
+  html += '<div class="btn-group" style="margin-top:12px;gap:8px;">' +
+    '<button type="submit" name="decision" value="approve" class="btn btn-success">Approve</button>' +
+    '<button type="submit" name="decision" value="revise" class="btn btn-outline" style="border-color:var(--color-warning);color:var(--color-warning);">Revise</button>' +
+    '<button type="submit" name="decision" value="reject" class="btn btn-danger">Reject</button>' +
+    '</div>';
+
+  html += '</form>';
+  return html;
 }
 
 function buildRatingInput(name, label) {
@@ -523,11 +623,64 @@ function buildFeedbackForm(productId) {
 async function submitApproval(productId, decision) {
   var result = await apiPost('/api/approve/' + productId, { decision: decision });
   if (result && result.success) {
-    showToast('Product ' + decision + 'd successfully', 'success');
+    showToast('Product ' + decision + 'd — ' + (result.message || ''), 'success');
     await loadApprovals();
     await loadDashboard();
   } else {
-    showToast('Failed to submit approval', 'error');
+    showToast('Failed to submit approval: ' + (result && result.error || 'unknown error'), 'error');
+  }
+}
+
+async function submitApprovalWithFeedback(event, productId) {
+  event.preventDefault();
+
+  // Determine which button was clicked
+  var submitter = event.submitter;
+  var decision = submitter ? submitter.value : null;
+  if (!decision) {
+    showToast('Please click Approve, Revise, or Reject', 'error');
+    return;
+  }
+
+  var form = document.getElementById('approval-form-' + productId);
+  var formData = new FormData(form);
+
+  var body = {
+    decision: decision,
+    layout: parseInt(formData.get('layout-' + productId), 10) || undefined,
+    typography: parseInt(formData.get('typography-' + productId), 10) || undefined,
+    color: parseInt(formData.get('color-' + productId), 10) || undefined,
+    differentiation: parseInt(formData.get('differentiation-' + productId), 10) || undefined,
+    sellability: parseInt(formData.get('sellability-' + productId), 10) || undefined,
+    issues: formData.get('issues') || '',
+    source: formData.get('source') || undefined,
+  };
+
+  // For revise/reject, require notes
+  if ((decision === 'revise' || decision === 'reject') && !body.issues) {
+    showToast('Please add notes explaining why you are ' + (decision === 'revise' ? 'requesting revision' : 'rejecting'), 'error');
+    return;
+  }
+
+  // Show processing state
+  var buttons = form.querySelectorAll('button[type="submit"]');
+  buttons.forEach(function (btn) { btn.disabled = true; });
+  showToast('Processing ' + decision + '...', 'info');
+
+  var result = await apiPost('/api/approve/' + productId, body);
+
+  buttons.forEach(function (btn) { btn.disabled = false; });
+
+  if (result && result.success) {
+    var msg = decision === 'revise'
+      ? 'Revision started — product will reappear after re-processing'
+      : 'Product ' + decision + 'd';
+    if (result.message) msg += ' — ' + result.message;
+    showToast(msg, 'success');
+    await loadApprovals();
+    await loadDashboard();
+  } else {
+    showToast('Failed: ' + (result && result.error || 'unknown error'), 'error');
   }
 }
 
@@ -567,7 +720,6 @@ async function submitFeedback(event, productId) {
   var result = await apiPost('/api/feedback/' + productId, body);
   if (result && result.success) {
     showToast('Feedback submitted', 'success');
-    // Also submit the approval decision
     await submitApproval(productId, body.decision);
   } else {
     showToast('Failed to submit feedback', 'error');
@@ -1125,7 +1277,9 @@ function init() {
 
 // Make functions available globally for inline onclick handlers
 window.submitApproval = submitApproval;
+window.submitApprovalWithFeedback = submitApprovalWithFeedback;
 window.submitFeedback = submitFeedback;
+window.togglePdfPreview = togglePdfPreview;
 window.loadDailyReviewForm = loadDailyReviewForm;
 window.submitDailyReview = submitDailyReview;
 window.loadWeeklyBatch = loadWeeklyBatch;

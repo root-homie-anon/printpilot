@@ -1,20 +1,25 @@
-import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
+import { readFile, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type {
   Opportunity,
   ProductBrief,
   Product,
-  ListingData,
   PipelineResult,
 } from '../types/index.js';
+import type { EnhancedProductBrief } from '../agents/strategist-enhanced.js';
+import type { ComparisonResult } from '../agents/reference-comparator.js';
 import { runAgent } from '../agents/runner.js';
-import { createPendingApproval, waitForApproval } from './approval-gate.js';
+import { createPendingApproval } from './approval-gate.js';
 import { loadConfig } from '../utils/config.js';
+import {
+  atomicWriteJson,
+  safeReadJson,
+  sendToDeadLetterQueue,
+} from '../utils/resilience.js';
 import {
   sendPipelineError,
   sendDailySummary,
-  sendListingLive,
 } from '../utils/notify.js';
 import logger from '../utils/logger.js';
 
@@ -28,24 +33,17 @@ async function writeProductState(
 ): Promise<void> {
   const dir = resolve(QUEUE_DIR, productId);
   await mkdir(dir, { recursive: true });
-  await writeFile(
-    resolve(dir, `${stage}.json`),
-    JSON.stringify(data, null, 2),
-    'utf-8'
-  );
+  await atomicWriteJson(resolve(dir, `${stage}.json`), data);
 }
 
 async function readProductState<T>(
   productId: string,
   stage: string
 ): Promise<T | null> {
-  try {
-    const filePath = resolve(QUEUE_DIR, productId, `${stage}.json`);
-    const raw = await readFile(filePath, 'utf-8');
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
-  }
+  return safeReadJson<T | null>(
+    resolve(QUEUE_DIR, productId, `${stage}.json`),
+    null
+  );
 }
 
 export async function runProductionPipeline(): Promise<PipelineResult> {
@@ -58,6 +56,30 @@ export async function runProductionPipeline(): Promise<PipelineResult> {
   };
 
   logger.info('=== Production pipeline started ===');
+
+  // ── Velocity Guard: ramp up listing rate for new shops ──────
+  // Etsy flags rapid automated listing on new shops. Start slow.
+  const listingsDir = resolve(STATE_BASE, 'listings');
+  let activeListingCount = 0;
+  try {
+    const { readdir } = await import('node:fs/promises');
+    const files = await readdir(listingsDir);
+    activeListingCount = files.filter((f) => f.endsWith('.json')).length;
+  } catch {
+    // No listings yet
+  }
+
+  let effectiveProductsPerDay = config.pipeline.productsPerDay;
+  if (activeListingCount < 20) {
+    effectiveProductsPerDay = Math.min(effectiveProductsPerDay, 1);
+    logger.info(
+      `Velocity guard: shop has ${activeListingCount} listings, ` +
+      `limiting to ${effectiveProductsPerDay}/day (ramp-up phase)`
+    );
+  } else if (activeListingCount < 50) {
+    effectiveProductsPerDay = Math.min(effectiveProductsPerDay, 2);
+  }
+  // Above 50 listings: use full configured rate
 
   // ── Stage 1: Research ───────────────────────────────────────
   let opportunities: Opportunity[] = [];
@@ -84,21 +106,24 @@ export async function runProductionPipeline(): Promise<PipelineResult> {
     return result;
   }
 
-  // ── Stage 2: Strategy — pick top N ─────────────────────────
-  let briefs: ProductBrief[] = [];
+  // ── Stage 2: Enhanced Strategy — competitive intel + pick top N ──
+  let briefs: EnhancedProductBrief[] = [];
   try {
-    logger.info('Stage 2: Running strategist agent');
-    const strategyResult = await runAgent<ProductBrief[]>('strategist', {
-      opportunities,
-      productsPerDay: config.pipeline.productsPerDay,
-    });
+    logger.info('Stage 2: Running enhanced strategist agent');
+    const strategyResult = await runAgent<EnhancedProductBrief[]>(
+      'strategist-enhanced',
+      {
+        opportunities,
+        productsPerDay: effectiveProductsPerDay,
+      }
+    );
 
     if (!strategyResult.success || !strategyResult.data) {
-      throw new Error(strategyResult.error ?? 'Strategist returned no data');
+      throw new Error(strategyResult.error ?? 'Enhanced strategist returned no data');
     }
 
     briefs = strategyResult.data;
-    logger.info(`Strategist selected ${briefs.length} products`);
+    logger.info(`Enhanced strategist selected ${briefs.length} products`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error(`Strategy stage failed: ${message}`);
@@ -161,62 +186,53 @@ export async function runProductionPipeline(): Promise<PipelineResult> {
 
       await writeProductState(productId, 'score', scoreResult.data);
 
-      // ── Stage 6: Approval Gate ────────────────────────────
-      logger.info(`Stage 6: Approval gate for product ${productId}`);
-      // createPendingApproval now automatically triggers Telegram notification
-      await createPendingApproval(productId);
+      // ── Stage 6: Reference Comparator ───────────────────
+      logger.info(`Stage 6: Running reference comparator for product ${productId}`);
+      try {
+        const comparisonResult = await runAgent<ComparisonResult>(
+          'reference-comparator',
+          { productId }
+        );
 
-      if (config.notifications.approvalRequired) {
-        // Wait for user decision via Telegram (or dashboard)
-        const approvalDecision = await waitForApproval(productId);
+        if (comparisonResult.success && comparisonResult.data) {
+          await writeProductState(productId, 'comparison', comparisonResult.data);
 
-        if (approvalDecision.decision === 'approve') {
-          result.approved++;
-
-          // ── Stage 7: Listing ──────────────────────────────
-          if (config.features.autoPublish) {
-            logger.info(`Stage 7: Running listing agent for product ${productId}`);
-            const listingResult = await runAgent<ListingData>('listing-agent', {
-              productId,
-              copy: copyResult.data,
-              pdfPath: designResult.data.pdfPath,
-            });
-
-            if (!listingResult.success || !listingResult.data) {
-              throw new Error(listingResult.error ?? 'Listing agent returned no data');
-            }
-
-            await writeProductState(productId, 'listing', listingResult.data);
-            result.listed++;
-
-            // Send listing live notification
-            await sendListingLive(listingResult.data);
-
-            logger.info(
-              `Product ${productId} listed at ${listingResult.data.etsyUrl}`
-            );
-          } else {
-            logger.info(
-              `Product ${productId} approved but autoPublish is disabled`
+          if (!comparisonResult.data.readyToList) {
+            logger.warn(
+              `Product ${productId} failed reference comparison ` +
+              `(alignment: ${comparisonResult.data.overallAlignment}/100). ` +
+              `Proceeding to approval with comparison data.`
             );
           }
-        } else {
-          logger.info(
-            `Product ${productId} ${approvalDecision.decision}ed` +
-            (approvalDecision.feedback ? `: ${approvalDecision.feedback}` : '')
-          );
         }
-      } else {
-        // No approval required — auto-approve
-        result.approved++;
-        logger.info(`Product ${productId} auto-approved (approval not required)`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.warn(`Reference comparator failed for ${productId}: ${message} — continuing`);
       }
+
+      // ── Stage 7: Approval Gate ────────────────────────────
+      // Pipeline creates pending approval and moves on.
+      // Approval decisions + listing are handled via the dashboard.
+      logger.info(`Stage 7: Approval gate for product ${productId}`);
+      await createPendingApproval(productId);
+      logger.info(
+        `Product ${productId} queued for dashboard approval — ` +
+        `review at http://localhost:${process.env.DASHBOARD_PORT ?? '3737'}/#approvals`
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logger.error(`Product ${productId} pipeline failed: ${message}`);
       result.errors.push(`${productId}: ${message}`);
 
       await sendPipelineError('product-pipeline', message, productId);
+
+      // Capture failed product for replay
+      await sendToDeadLetterQueue(
+        'product-pipeline',
+        message,
+        { productId, brief },
+        productId
+      ).catch(() => { /* DLQ write failure shouldn't block pipeline */ });
     }
   }
 

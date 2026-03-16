@@ -4,10 +4,8 @@ import { resolve, join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { getEnv } from '../utils/env.js';
 import logger from '../utils/logger.js';
-import { submitApproval, checkApproval } from '../pipeline/approval-gate.js';
+import { checkApproval } from '../pipeline/approval-gate.js';
 import type {
-  FeedbackDecision,
-  ProductBrief,
   ListingData,
 } from '../types/index.js';
 
@@ -16,13 +14,6 @@ const PRODUCTS_DIR = resolve(STATE_DIR, 'products');
 const LISTINGS_DIR = resolve(STATE_DIR, 'listings');
 
 let botInstance: Telegraf | null = null;
-
-interface PendingReply {
-  productId: string;
-  action: 'reject' | 'revise';
-}
-
-const pendingReplies = new Map<number, PendingReply>();
 
 async function readJsonFile<T>(filePath: string): Promise<T | null> {
   try {
@@ -70,111 +61,6 @@ export async function startBot(): Promise<void> {
   botInstance = new Telegraf(token);
   const bot = botInstance;
 
-  // Handle inline keyboard callback queries (Approve/Reject/Revise buttons)
-  bot.on('callback_query', async (ctx) => {
-    try {
-      const callbackQuery = ctx.callbackQuery;
-      if (!('data' in callbackQuery) || !callbackQuery.data) {
-        await ctx.answerCbQuery('Invalid callback');
-        return;
-      }
-
-      const data = callbackQuery.data;
-      const parts = data.split('_');
-      const action = parts[0] as string;
-      const productId = parts.slice(1).join('_');
-
-      if (!productId) {
-        await ctx.answerCbQuery('Invalid product ID');
-        return;
-      }
-
-      const decisionMap: Record<string, FeedbackDecision> = {
-        approve: 'approve',
-        reject: 'reject',
-        revise: 'revise',
-      };
-
-      const decision = decisionMap[action];
-      if (!decision) {
-        await ctx.answerCbQuery('Unknown action');
-        return;
-      }
-
-      if (decision === 'approve') {
-        await submitApproval(productId, 'approve');
-        await ctx.answerCbQuery('Product approved!');
-        await ctx.editMessageReplyMarkup(undefined);
-        await ctx.reply(
-          `Product \`${productId}\` has been *approved* and will proceed to listing\\.`,
-          { parse_mode: 'MarkdownV2' },
-        );
-        logger.info('Product approved via Telegram', { productId });
-      } else {
-        // For reject/revise, ask for feedback
-        const chatId = callbackQuery.from.id;
-        pendingReplies.set(chatId, { productId, action: decision });
-        await ctx.answerCbQuery(`Please reply with your ${decision} reason`);
-        await ctx.editMessageReplyMarkup(undefined);
-        await ctx.reply(
-          `Please reply with your reason for *${decision === 'reject' ? 'rejecting' : 'requesting revision of'}* product \`${productId}\`:`,
-          { parse_mode: 'MarkdownV2' },
-        );
-        logger.info(`Awaiting ${decision} feedback via Telegram`, { productId });
-      }
-    } catch (error) {
-      const errMsg = error instanceof Error ? error.message : String(error);
-      logger.error('Error handling callback query', { error: errMsg });
-      try {
-        await ctx.answerCbQuery('An error occurred. Check logs.');
-      } catch {
-        // Ignore answer callback errors
-      }
-    }
-  });
-
-  // Handle text messages (for reject/revise feedback replies)
-  bot.on('text', async (ctx) => {
-    try {
-      const chatId = ctx.from.id;
-      const pending = pendingReplies.get(chatId);
-
-      if (!pending) {
-        // Not a feedback reply, ignore
-        return;
-      }
-
-      const feedback = ctx.message.text;
-      const { productId, action } = pending;
-
-      await submitApproval(productId, action, {
-        id: `feedback-${productId}-${Date.now()}`,
-        productId,
-        layout: 0,
-        typography: 0,
-        color: 0,
-        differentiation: 0,
-        sellability: 0,
-        issues: feedback,
-        source: 'design',
-        decision: action,
-        createdAt: new Date().toISOString(),
-      });
-
-      pendingReplies.delete(chatId);
-
-      const actionLabel = action === 'reject' ? 'rejected' : 'sent for revision';
-      await ctx.reply(
-        `Product \`${productId}\` has been *${actionLabel}*\\.\n\nFeedback: ${feedback.replace(/([_*[\]()~`>#+\-=|{}.!])/g, '\\$1')}`,
-        { parse_mode: 'MarkdownV2' },
-      );
-      logger.info(`Product ${action}ed via Telegram with feedback`, { productId });
-    } catch (error) {
-      const errMsg = error instanceof Error ? error.message : String(error);
-      logger.error('Error handling text message', { error: errMsg });
-    }
-  });
-
   // /status command — current pipeline status
   bot.command('status', async (ctx) => {
     try {
@@ -212,6 +98,7 @@ export async function startBot(): Promise<void> {
         }
       }
 
+      const dashPort = process.env.DASHBOARD_PORT ?? '3737';
       const lines = [
         '*Pipeline Status*',
         '',
@@ -224,6 +111,8 @@ export async function startBot(): Promise<void> {
         `Listed: ${stages['listed']}`,
         '',
         `Total Products: ${productIds.length}`,
+        '',
+        `Dashboard: http://localhost:${dashPort}/#approvals`,
       ];
 
       await ctx.reply(lines.join('\n'), { parse_mode: 'MarkdownV2' });
@@ -252,6 +141,7 @@ export async function startBot(): Promise<void> {
         return;
       }
 
+      const dashPort = process.env.DASHBOARD_PORT ?? '3737';
       const lines = [
         `*Pending Approvals \\(${pendingProducts.length}\\)*`,
         '',
@@ -259,6 +149,8 @@ export async function startBot(): Promise<void> {
           const escapedId = id.replace(/([_*[\]()~`>#+\-=|{}.!])/g, '\\$1');
           return `\\- \`${escapedId}\``;
         }),
+        '',
+        `Review at: http://localhost:${dashPort}/#approvals`,
       ];
 
       await ctx.reply(lines.join('\n'), { parse_mode: 'MarkdownV2' });
@@ -316,7 +208,7 @@ export async function startBot(): Promise<void> {
 
   // Launch in long-polling mode
   await bot.launch();
-  logger.info('Telegram bot started in long-polling mode');
+  logger.info('Telegram bot started (notifications + status commands only)');
 }
 
 export async function stopBot(): Promise<void> {

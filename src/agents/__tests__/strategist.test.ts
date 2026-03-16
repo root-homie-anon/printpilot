@@ -44,9 +44,10 @@ const VALID_CONFIG = {
   agents: {
     designer: { pageSize: 'A4' as const, exportDpi: 300, referenceLibraryPath: 'src/renderer/reference-library' },
     researcher: { maxOpportunitiesPerRun: 10, minReviewCount: 50, targetPriceRange: [3, 25] as [number, number] },
-    marketing: { pinsPerProduct: 3, emailEnabled: true, blogEnabled: true },
+    marketing: { pinsPerProduct: 3, pinterestEnabled: false, emailEnabled: false, blogEnabled: false },
   },
-  notifications: { channel: 'telegram', approvalRequired: true, weeklyReviewDay: 'sunday' },
+  notifications: { channel: 'telegram', approvalRequired: false, weeklyReviewDay: 'sunday' },
+  dashboard: { port: 3737 },
   features: { autoPublish: false, autoSynthesize: true, dashboardEnabled: true, marketingEnabled: true },
 };
 

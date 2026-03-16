@@ -2,8 +2,6 @@ import { Telegraf } from 'telegraf';
 import { getEnv } from './env.js';
 import logger from './logger.js';
 import type {
-  ScoreReport,
-  ProductBrief,
   PipelineResult,
   SynthesisResult,
   ListingData,
@@ -38,6 +36,18 @@ function timestamp(): string {
   return new Date().toISOString().replace('T', ' ').slice(0, 19);
 }
 
+async function fallbackNotify(message: string): Promise<void> {
+  // Write critical notifications to a file when Telegram is down
+  const { appendFile, mkdir } = await import('node:fs/promises');
+  const { resolve } = await import('node:path');
+  const alertDir = resolve(process.cwd(), 'state', 'alerts');
+  await mkdir(alertDir, { recursive: true });
+  const alertFile = resolve(alertDir, `alerts-${new Date().toISOString().slice(0, 10)}.log`);
+  const line = `[${new Date().toISOString()}] ${message.replace(/<[^>]+>/g, '')}\n`;
+  await appendFile(alertFile, line, 'utf-8');
+  logger.warn('Notification written to fallback file', { file: alertFile });
+}
+
 export async function sendNotification(message: string): Promise<void> {
   try {
     const telegram = getBot();
@@ -46,8 +56,9 @@ export async function sendNotification(message: string): Promise<void> {
     logger.info('Notification sent', { channel: 'telegram', length: message.length });
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
-    logger.error('Failed to send notification', { error: errMsg });
-    // Log and continue — don't crash the pipeline
+    logger.error('Failed to send Telegram notification', { error: errMsg });
+    // Fallback: write to alert file so nothing is lost
+    await fallbackNotify(message).catch(() => { /* last resort */ });
   }
 }
 
@@ -60,62 +71,7 @@ export async function sendMarkdownV2(message: string): Promise<void> {
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     logger.error('Failed to send MarkdownV2 notification', { error: errMsg });
-  }
-}
-
-export async function sendApprovalRequest(
-  productId: string,
-  scoreReport: ScoreReport,
-  brief: ProductBrief,
-): Promise<void> {
-  try {
-    const telegram = getBot();
-    const chatId = getChatId();
-
-    const ts = escapeMarkdownV2(timestamp());
-    const escapedId = escapeMarkdownV2(productId);
-    const escapedNiche = escapeMarkdownV2(brief.niche);
-    const escapedAudience = escapeMarkdownV2(brief.targetAudience);
-    const escapedRecommendation = escapeMarkdownV2(scoreReport.recommendation);
-
-    const message = [
-      `*New Product Ready for Review*`,
-      ``,
-      `*Product ID:* \`${escapedId}\``,
-      `*Niche:* ${escapedNiche}`,
-      `*Target Audience:* ${escapedAudience}`,
-      `*Pages:* ${brief.pageCount}`,
-      ``,
-      `*Scores Breakdown:*`,
-      `  Layout: ${scoreReport.layout}/5`,
-      `  Typography: ${scoreReport.typography}/5`,
-      `  Color: ${scoreReport.color}/5`,
-      `  Differentiation: ${scoreReport.differentiation}/5`,
-      `  Sellability: ${scoreReport.sellability}/5`,
-      `  *Overall: ${scoreReport.overallScore}/5*`,
-      ``,
-      `*Recommendation:* ${escapedRecommendation}`,
-      ``,
-      `${ts}`,
-    ].join('\n');
-
-    await telegram.telegram.sendMessage(chatId, message, {
-      parse_mode: 'MarkdownV2',
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: 'Approve', callback_data: `approve_${productId}` },
-            { text: 'Reject', callback_data: `reject_${productId}` },
-            { text: 'Revise', callback_data: `revise_${productId}` },
-          ],
-        ],
-      },
-    });
-
-    logger.info('Approval request sent via Telegram', { productId });
-  } catch (error) {
-    const errMsg = error instanceof Error ? error.message : String(error);
-    logger.error('Failed to send approval request', { productId, error: errMsg });
+    await fallbackNotify(message).catch(() => { /* last resort */ });
   }
 }
 

@@ -16,7 +16,12 @@ import type {
   Product,
   FeedbackSource,
   FeedbackDecision,
+  FeedbackRecord,
 } from '../types/index.js';
+import {
+  processApprovalDecision,
+  type ApprovalData,
+} from '../pipeline/approval-gate.js';
 
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -77,6 +82,14 @@ interface ActivityEntry {
 interface ApprovalRequest {
   decision: FeedbackDecision;
   notes?: string;
+  // Integrated feedback fields (optional — can submit approval without ratings)
+  layout?: number;
+  typography?: number;
+  color?: number;
+  differentiation?: number;
+  sellability?: number;
+  issues?: string;
+  source?: FeedbackSource;
 }
 
 interface FeedbackRequest {
@@ -420,6 +433,35 @@ async function handlePostApproval(req: Request, res: Response): Promise<void> {
       return;
     }
 
+    // Build feedback record if ratings were provided
+    let feedbackRecord: FeedbackRecord | undefined;
+    if (body.layout && body.typography && body.color && body.differentiation && body.sellability) {
+      feedbackRecord = {
+        id: `${Date.now()}-${id}`,
+        productId: id,
+        layout: body.layout,
+        typography: body.typography,
+        color: body.color,
+        differentiation: body.differentiation,
+        sellability: body.sellability,
+        issues: body.issues ?? '',
+        source: body.source ?? 'design',
+        decision: body.decision,
+        createdAt: new Date().toISOString(),
+      };
+
+      // Also save feedback to daily feedback store
+      const { writeFile: writeFeedback, mkdir: mkdirFeedback } = await import('node:fs/promises');
+      const dailyDir = resolve(FEEDBACK_DIR, 'daily');
+      await mkdirFeedback(dailyDir, { recursive: true });
+      const dateStr = new Date().toISOString().split('T')[0];
+      await writeFeedback(
+        join(dailyDir, `${dateStr}-${id}.json`),
+        JSON.stringify(feedbackRecord, null, 2)
+      );
+    }
+
+    // Update product.json status
     const { writeFile, mkdir } = await import('node:fs/promises');
     const productDir = resolve(PRODUCTS_DIR, id);
     await mkdir(productDir, { recursive: true });
@@ -441,12 +483,102 @@ async function handlePostApproval(req: Request, res: Response): Promise<void> {
       await writeFile(productPath, JSON.stringify(updated, null, 2));
     }
 
-    logger.info(`Product ${id} ${body.decision}d`);
-    res.json({ success: true, decision: body.decision });
+    // Process the approval decision (triggers listing or revision loop)
+    const result = await processApprovalDecision(id, body.decision, feedbackRecord);
+
+    logger.info(`Product ${id} ${body.decision}d — ${result.message}`);
+    res.json({
+      success: result.success,
+      decision: body.decision,
+      message: result.message,
+      listingData: result.listingData,
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     logger.error(`Failed to submit approval: ${message}`);
     res.status(500).json({ error: 'Failed to submit approval' });
+  }
+}
+
+async function handleGetProductPdf(req: Request, res: Response): Promise<void> {
+  try {
+    const rawId = req.params.id;
+    const id = Array.isArray(rawId) ? rawId[0] : rawId;
+    if (!id) {
+      res.status(400).json({ error: 'Product ID is required' });
+      return;
+    }
+
+    const productDir = resolve(PRODUCTS_DIR, id);
+    const design = await readJsonFile<{ pdfPath: string }>(join(productDir, 'design.json'));
+
+    if (!design || !design.pdfPath) {
+      res.status(404).json({ error: 'No PDF found for this product' });
+      return;
+    }
+
+    // Resolve the PDF path (could be relative or absolute)
+    const pdfPath = resolve(process.cwd(), design.pdfPath);
+
+    if (!existsSync(pdfPath)) {
+      res.status(404).json({ error: 'PDF file not found on disk' });
+      return;
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${id}.pdf"`);
+
+    const pdfBuffer = await readFile(pdfPath);
+    res.send(pdfBuffer);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    logger.error(`Failed to serve PDF: ${message}`);
+    res.status(500).json({ error: 'Failed to serve PDF' });
+  }
+}
+
+async function handleGetApprovalData(req: Request, res: Response): Promise<void> {
+  try {
+    const rawId = req.params.id;
+    const id = Array.isArray(rawId) ? rawId[0] : rawId;
+    if (!id) {
+      res.status(400).json({ error: 'Product ID is required' });
+      return;
+    }
+
+    const productDir = resolve(PRODUCTS_DIR, id);
+
+    const approval = await readJsonFile<ApprovalData>(join(productDir, 'approval.json'));
+    const brief = await readJsonFile<ProductBrief>(join(productDir, 'brief.json'));
+    const design = await readJsonFile<{ pdfPath: string }>(join(productDir, 'design.json'));
+    const copy = await readJsonFile<{ title: string; description: string; tags: string[] }>(
+      join(productDir, 'copy.json')
+    );
+    const score = await readJsonFile<Record<string, unknown>>(join(productDir, 'score.json'));
+    const scoreReport = await readJsonFile<Record<string, unknown>>(
+      join(productDir, 'score-report.json')
+    );
+    const comparison = await readJsonFile<Record<string, unknown>>(
+      join(productDir, 'comparison.json')
+    );
+
+    const hasPdf = !!(design && design.pdfPath);
+
+    res.json({
+      productId: id,
+      approval,
+      brief,
+      design,
+      copy,
+      score,
+      scoreReport,
+      comparison,
+      hasPdf,
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    logger.error(`Failed to load approval data: ${message}`);
+    res.status(500).json({ error: 'Failed to load approval data' });
   }
 }
 
@@ -687,6 +819,8 @@ export async function startDashboardServer(): Promise<void> {
   app.get('/api/niches', handleGetNiches);
   app.get('/api/activity', handleGetActivity);
   app.post('/api/approve/:id', handlePostApproval);
+  app.get('/api/approve/:id/data', handleGetApprovalData);
+  app.get('/api/products/:id/pdf', handleGetProductPdf);
   app.post('/api/feedback/:id', handlePostFeedback);
 
   // Review routes

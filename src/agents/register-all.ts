@@ -3,9 +3,11 @@ import { resolve } from 'node:path';
 import { registerAgent } from './runner.js';
 import { runResearch } from './researcher.js';
 import { runStrategy } from './strategist.js';
+import { runEnhancedStrategy } from './strategist-enhanced.js';
 import { runDesign } from './designer.js';
 import { runCopywriting } from './copywriter.js';
 import { runScoring } from './scorer.js';
+import { runComparison } from './reference-comparator.js';
 import { PinterestClient } from '../marketing/pinterest.js';
 import { EmailClient } from '../marketing/email.js';
 import { BlogClient } from '../marketing/blog.js';
@@ -99,10 +101,26 @@ export function registerAllAgents(): void {
     return result.data ?? [];
   });
 
-  // ── strategist ───────────────────────────────────────────────
+  // ── strategist (basic) ───────────────────────────────────────
   registerAgent('strategist', async (_input: unknown) => {
     const result = await runStrategy();
     return result.data ?? [];
+  });
+
+  // ── strategist-enhanced (with competitive intel) ────────────
+  registerAgent('strategist-enhanced', async (_input: unknown) => {
+    const result = await runEnhancedStrategy();
+    return result.data ?? [];
+  });
+
+  // ── reference-comparator (quality gate) ─────────────────────
+  registerAgent('reference-comparator', async (input: unknown) => {
+    const { productId } = input as { productId: string };
+    const result = await runComparison(productId);
+    if (!result.success || !result.data) {
+      throw new Error(result.error ?? 'Reference comparator returned no data');
+    }
+    return result.data;
   });
 
   // ── designer ─────────────────────────────────────────────────

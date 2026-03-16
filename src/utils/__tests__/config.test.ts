@@ -46,14 +46,18 @@ const VALID_CONFIG = {
     },
     marketing: {
       pinsPerProduct: 3,
-      emailEnabled: true,
-      blogEnabled: true,
+      pinterestEnabled: false,
+      emailEnabled: false,
+      blogEnabled: false,
     },
   },
   notifications: {
     channel: 'telegram',
-    approvalRequired: true,
+    approvalRequired: false,
     weeklyReviewDay: 'sunday',
+  },
+  dashboard: {
+    port: 3737,
   },
   features: {
     autoPublish: false,

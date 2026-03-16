@@ -71,7 +71,7 @@ export async function scheduleMarketing(
   const actions: ScheduledAction[] = [];
 
   // Pinterest pins — delayed by pinterestDelayDays from listing date
-  if (marketingConfig.pinsPerProduct > 0) {
+  if (marketingConfig.pinterestEnabled && marketingConfig.pinsPerProduct > 0) {
     const pinterestDate = addDays(now, pipelineConfig.pinterestDelayDays);
     actions.push({
       channel: 'pinterest',

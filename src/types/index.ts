@@ -117,13 +117,10 @@ export interface AgentResult<T> {
 }
 
 export interface ScoreReport {
-  overallScore: number;
+  productId: string;
+  scores: Record<string, number>;
   recommendation: string;
-  layout: number;
-  typography: number;
-  color: number;
-  differentiation: number;
-  sellability: number;
+  flags: string[];
 }
 
 export interface PipelineResult {

@@ -1,4 +1,10 @@
 import logger from '../utils/logger.js';
+import {
+  withTimeout,
+  withRetry,
+  isRetryableError,
+  CircuitBreaker,
+} from '../utils/resilience.js';
 import type {
   CreateListingInput,
   EtsyListing,
@@ -8,6 +14,8 @@ import type {
 
 const BASE_URL = 'https://api.etsy.com/v3';
 const RATE_LIMIT_WARNING_THRESHOLD = 0.8;
+const REQUEST_TIMEOUT_MS = 30_000;
+const MAX_RETRY_ATTEMPTS = 3;
 
 export class EtsyApiError extends Error {
   public readonly statusCode: number;
@@ -33,11 +41,17 @@ export class EtsyClient {
   private readonly apiSecret: string;
   private readonly shopId: string;
   private accessToken: string | null = null;
+  private readonly circuitBreaker: CircuitBreaker;
 
   constructor(apiKey: string, apiSecret: string, shopId: string) {
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
     this.shopId = shopId;
+    this.circuitBreaker = new CircuitBreaker({
+      name: 'etsy-api',
+      failureThreshold: 5,
+      resetTimeoutMs: 60_000,
+    });
   }
 
   setAccessToken(token: string): void {
@@ -87,21 +101,53 @@ export class EtsyClient {
 
     logger.debug(`Etsy API ${method} ${path}`);
 
-    const response = await fetch(url, {
-      method,
-      headers: this.getHeaders(),
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    return this.circuitBreaker.execute(() =>
+      withRetry(
+        async () => {
+          const response = await withTimeout(
+            fetch(url, {
+              method,
+              headers: this.getHeaders(),
+              body: body ? JSON.stringify(body) : undefined,
+            }),
+            REQUEST_TIMEOUT_MS,
+            `${method} ${path}`
+          );
 
-    this.checkRateLimits(response);
+          this.checkRateLimits(response);
 
-    if (!response.ok) {
-      const responseBody = await response.text();
-      throw new EtsyApiError(response.status, path, responseBody);
-    }
+          // Handle rate limiting with Retry-After header
+          if (response.status === 429) {
+            const retryAfter = response.headers.get('Retry-After');
+            const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 5000;
+            logger.warn(`Etsy rate limited on ${path}. Waiting ${waitMs}ms`);
+            await new Promise<void>((r) => setTimeout(r, waitMs));
+            throw new EtsyApiError(429, path, 'Rate limited');
+          }
 
-    const data = (await response.json()) as T;
-    return data;
+          if (!response.ok) {
+            const responseBody = await response.text();
+            throw new EtsyApiError(response.status, path, responseBody);
+          }
+
+          const data = (await response.json()) as T;
+          return data;
+        },
+        {
+          maxAttempts: MAX_RETRY_ATTEMPTS,
+          retryOn: (error) => {
+            if (error instanceof EtsyApiError) {
+              return [429, 500, 502, 503, 504].includes(error.statusCode);
+            }
+            return isRetryableError(error);
+          },
+          onRetry: (attempt, error) => {
+            const msg = error instanceof Error ? error.message : String(error);
+            logger.warn(`Etsy API retry ${attempt} for ${method} ${path}: ${msg}`);
+          },
+        }
+      )
+    );
   }
 
   async createDraftListing(data: CreateListingInput): Promise<EtsyListing> {
@@ -148,22 +194,41 @@ export class EtsyClient {
       headers['Authorization'] = `Bearer ${this.accessToken}`;
     }
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: formData,
-    });
+    await this.circuitBreaker.execute(() =>
+      withRetry(
+        async () => {
+          const response = await withTimeout(
+            fetch(url, {
+              method: 'POST',
+              headers,
+              body: formData,
+            }),
+            120_000, // 2 min for file upload
+            `upload file for listing ${listingId}`
+          );
 
-    this.checkRateLimits(response);
+          this.checkRateLimits(response);
 
-    if (!response.ok) {
-      const responseBody = await response.text();
-      throw new EtsyApiError(
-        response.status,
-        `/listings/${listingId}/files`,
-        responseBody
-      );
-    }
+          if (!response.ok) {
+            const responseBody = await response.text();
+            throw new EtsyApiError(
+              response.status,
+              `/listings/${listingId}/files`,
+              responseBody
+            );
+          }
+        },
+        {
+          maxAttempts: MAX_RETRY_ATTEMPTS,
+          retryOn: (error) => {
+            if (error instanceof EtsyApiError) {
+              return [429, 500, 502, 503, 504].includes(error.statusCode);
+            }
+            return isRetryableError(error);
+          },
+        }
+      )
+    );
 
     logger.info(`Digital file uploaded successfully for listing ${listingId}`);
   }

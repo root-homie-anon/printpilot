@@ -6,8 +6,12 @@ import type {
   ScoreReport,
   ProductBrief,
   ApprovalDecision,
+  ListingData,
 } from '../types/index.js';
-import { sendApprovalRequest } from '../utils/notify.js';
+import { runAgent } from '../agents/runner.js';
+import { sendListingLive } from '../utils/notify.js';
+import { atomicWriteJson, safeReadJson } from '../utils/resilience.js';
+import { loadConfig } from '../utils/config.js';
 import logger from '../utils/logger.js';
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'revision-requested';
@@ -19,11 +23,10 @@ export interface ApprovalData {
   feedback?: FeedbackRecord;
   submittedAt: string;
   reviewedAt?: string;
+  revisionCount?: number;
 }
 
 const STATE_BASE = resolve(process.cwd(), 'state/products');
-const DEFAULT_TIMEOUT_MS = 24 * 60 * 60 * 1000; // 24 hours
-const POLL_INTERVAL_MS = 5000; // 5 seconds
 
 function approvalPath(productId: string): string {
   return resolve(STATE_BASE, productId, 'approval.json');
@@ -76,12 +79,17 @@ export async function submitApproval(
     feedback,
     submittedAt: existing?.submittedAt ?? new Date().toISOString(),
     reviewedAt: new Date().toISOString(),
+    revisionCount: existing?.revisionCount ?? 0,
   };
 
   await writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
   logger.info(`Approval saved for product ${productId}: ${data.status}`);
 }
 
+/**
+ * Create a pending approval — no Telegram, just writes the state file.
+ * Products stay pending indefinitely until acted on via the dashboard.
+ */
 export async function createPendingApproval(productId: string): Promise<void> {
   const filePath = approvalPath(productId);
   const dir = dirname(filePath);
@@ -91,86 +99,198 @@ export async function createPendingApproval(productId: string): Promise<void> {
     productId,
     status: 'pending',
     submittedAt: new Date().toISOString(),
+    revisionCount: 0,
   };
 
   await writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
-  logger.info(`Pending approval created for product ${productId}`);
-
-  // Automatically trigger Telegram notification
-  await notifyForApproval(productId);
+  logger.info(`Pending approval created for product ${productId} — awaiting dashboard review`);
 }
 
-export async function notifyForApproval(productId: string): Promise<void> {
-  try {
-    const productDir = resolve(STATE_BASE, productId);
-
-    const briefRaw = await readFile(resolve(productDir, 'brief.json'), 'utf-8');
-    const brief = JSON.parse(briefRaw) as ProductBrief;
-
-    const scoreRaw = await readFile(resolve(productDir, 'score.json'), 'utf-8');
-    const scoreReport = JSON.parse(scoreRaw) as ScoreReport;
-
-    await sendApprovalRequest(productId, scoreReport, brief);
-    logger.info(`Telegram approval notification sent for product ${productId}`);
-  } catch (error) {
-    const errMsg = error instanceof Error ? error.message : String(error);
-    logger.error(`Failed to send approval notification for product ${productId}`, {
-      error: errMsg,
-    });
-    // Don't throw — notification failure shouldn't block the pipeline
-  }
-}
-
-export async function waitForApproval(
+/**
+ * Process an approval decision from the dashboard.
+ * - approve: optionally run listing agent if autoPublish is on
+ * - reject: mark as rejected, done
+ * - revise: re-run designer → copywriter → scorer, then set back to pending
+ */
+export async function processApprovalDecision(
   productId: string,
-  timeoutMs: number = DEFAULT_TIMEOUT_MS,
-): Promise<ApprovalDecision> {
-  logger.info(`Waiting for approval of product ${productId} (timeout: ${timeoutMs}ms)`);
+  decision: FeedbackDecision,
+  feedback?: FeedbackRecord
+): Promise<{ success: boolean; message: string; listingData?: ListingData }> {
+  await submitApproval(productId, decision, feedback);
 
-  const startTime = Date.now();
+  if (decision === 'reject') {
+    logger.info(`Product ${productId} rejected via dashboard`);
+    return { success: true, message: 'Product rejected' };
+  }
 
-  while (Date.now() - startTime < timeoutMs) {
-    const status = await checkApproval(productId);
+  if (decision === 'revise') {
+    return await runRevisionLoop(productId, feedback?.issues);
+  }
 
-    if (status !== 'pending') {
-      const filePath = approvalPath(productId);
-      const raw = await readFile(filePath, 'utf-8');
-      const data = JSON.parse(raw) as ApprovalData;
+  // decision === 'approve'
+  const config = await loadConfig();
+  if (!config.features.autoPublish) {
+    logger.info(`Product ${productId} approved but autoPublish is disabled`);
+    return { success: true, message: 'Product approved (autoPublish disabled)' };
+  }
 
-      const decisionMap: Record<ApprovalStatus, FeedbackDecision> = {
-        approved: 'approve',
-        rejected: 'reject',
-        'revision-requested': 'revise',
-        pending: 'approve', // Unreachable due to the status check above
-      };
+  return await runListingStage(productId);
+}
 
-      const result: ApprovalDecision = {
-        decision: data.decision ?? decisionMap[status],
-        feedback: data.feedback?.issues,
-        decidedAt: data.reviewedAt ?? new Date().toISOString(),
-      };
+/**
+ * Revision loop: re-run designer → copywriter → scorer with feedback,
+ * then set product back to pending approval.
+ */
+async function runRevisionLoop(
+  productId: string,
+  feedbackNotes?: string
+): Promise<{ success: boolean; message: string }> {
+  const productDir = resolve(STATE_BASE, productId);
 
-      logger.info(`Approval received for product ${productId}: ${result.decision}`);
-      return result;
+  // Read current brief
+  const brief = await safeReadJson<ProductBrief | null>(
+    resolve(productDir, 'brief.json'),
+    null
+  );
+
+  if (!brief) {
+    return { success: false, message: 'Cannot revise: brief not found' };
+  }
+
+  // Read existing approval to track revision count
+  const approvalData = await safeReadJson<ApprovalData | null>(
+    approvalPath(productId),
+    null
+  );
+  const revisionCount = (approvalData?.revisionCount ?? 0) + 1;
+
+  logger.info(`Starting revision loop #${revisionCount} for product ${productId}`);
+
+  const config = await loadConfig();
+
+  try {
+    // Re-run designer with feedback context
+    logger.info(`Revision: re-running designer for product ${productId}`);
+    const designResult = await runAgent<{ pdfPath: string }>('designer', {
+      brief,
+      pageSize: config.agents.designer.pageSize,
+      exportDpi: config.agents.designer.exportDpi,
+      revisionFeedback: feedbackNotes,
+      revisionNumber: revisionCount,
+    });
+
+    if (!designResult.success || !designResult.data) {
+      throw new Error(designResult.error ?? 'Designer returned no data');
     }
 
-    await new Promise<void>((r) => {
-      setTimeout(r, POLL_INTERVAL_MS);
+    await atomicWriteJson(resolve(productDir, 'design.json'), designResult.data);
+
+    // Re-run copywriter
+    logger.info(`Revision: re-running copywriter for product ${productId}`);
+    const copyResult = await runAgent<{
+      title: string;
+      description: string;
+      tags: string[];
+    }>('copywriter', {
+      brief,
+      productId,
+      revisionFeedback: feedbackNotes,
+      revisionNumber: revisionCount,
     });
+
+    if (!copyResult.success || !copyResult.data) {
+      throw new Error(copyResult.error ?? 'Copywriter returned no data');
+    }
+
+    await atomicWriteJson(resolve(productDir, 'copy.json'), copyResult.data);
+
+    // Re-run scorer
+    logger.info(`Revision: re-running scorer for product ${productId}`);
+    const scoreResult = await runAgent<{
+      overallScore: number;
+      recommendation: string;
+    }>('scorer', {
+      brief,
+      design: designResult.data,
+      copy: copyResult.data,
+      revisionNumber: revisionCount,
+    });
+
+    if (!scoreResult.success || !scoreResult.data) {
+      throw new Error(scoreResult.error ?? 'Scorer returned no data');
+    }
+
+    await atomicWriteJson(resolve(productDir, 'score.json'), scoreResult.data);
+
+    // Set back to pending with updated revision count
+    const pendingData: ApprovalData = {
+      productId,
+      status: 'pending',
+      submittedAt: new Date().toISOString(),
+      revisionCount,
+    };
+    await writeFile(approvalPath(productId), JSON.stringify(pendingData, null, 2), 'utf-8');
+
+    logger.info(`Revision loop #${revisionCount} complete for product ${productId} — back to pending`);
+    return {
+      success: true,
+      message: `Revision #${revisionCount} complete — product is back in approval queue`,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`Revision loop failed for product ${productId}: ${message}`);
+    return { success: false, message: `Revision failed: ${message}` };
+  }
+}
+
+/**
+ * Run the listing agent for an approved product.
+ */
+async function runListingStage(
+  productId: string
+): Promise<{ success: boolean; message: string; listingData?: ListingData }> {
+  const productDir = resolve(STATE_BASE, productId);
+
+  const copy = await safeReadJson<{ title: string; description: string; tags: string[] } | null>(
+    resolve(productDir, 'copy.json'),
+    null
+  );
+  const design = await safeReadJson<{ pdfPath: string } | null>(
+    resolve(productDir, 'design.json'),
+    null
+  );
+
+  if (!copy || !design) {
+    return { success: false, message: 'Cannot list: copy or design data missing' };
   }
 
-  // Timeout reached — treat as still pending, return a timeout decision
-  logger.warn(`Approval timeout reached for product ${productId}`);
-  const timeoutDecision: ApprovalDecision = {
-    decision: 'reject',
-    feedback: 'Approval timed out after 24 hours',
-    decidedAt: new Date().toISOString(),
-  };
+  try {
+    logger.info(`Running listing agent for approved product ${productId}`);
+    const listingResult = await runAgent<ListingData>('listing-agent', {
+      productId,
+      copy,
+      pdfPath: design.pdfPath,
+    });
 
-  // Record the timeout as a rejection
-  await submitApproval(productId, 'reject');
+    if (!listingResult.success || !listingResult.data) {
+      throw new Error(listingResult.error ?? 'Listing agent returned no data');
+    }
 
-  return timeoutDecision;
+    await atomicWriteJson(resolve(productDir, 'listing.json'), listingResult.data);
+    await sendListingLive(listingResult.data);
+
+    logger.info(`Product ${productId} listed at ${listingResult.data.etsyUrl}`);
+    return {
+      success: true,
+      message: `Listed at ${listingResult.data.etsyUrl}`,
+      listingData: listingResult.data,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`Listing failed for product ${productId}: ${message}`);
+    return { success: false, message: `Listing failed: ${message}` };
+  }
 }
 
 export default checkApproval;

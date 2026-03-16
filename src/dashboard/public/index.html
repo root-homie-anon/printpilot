@@ -176,9 +176,18 @@
 
     <!-- ── Approvals View ────────────────────────────────────────── -->
     <section id="view-approvals" class="view-section">
+      <div class="card full-width" style="margin-bottom: 16px;">
+        <div class="card-header">
+          <span class="card-title">Pending Approvals</span>
+          <span class="badge badge-info" id="approval-count">0</span>
+        </div>
+        <p style="font-size: 0.875rem; color: var(--color-text-muted); margin: 0;">
+          Products stay pending until you act. Preview the PDF, rate quality, and approve/reject/revise.
+        </p>
+      </div>
       <div id="pending-approvals"></div>
       <div class="empty-state" id="no-approvals" style="display: none;">
-        <p>No products pending approval.</p>
+        <p>No products pending approval. New products will appear here after scoring.</p>
       </div>
     </section>
 
