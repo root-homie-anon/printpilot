@@ -14,6 +14,7 @@
   "credentials": {
     "etsyOAuth": ".credentials/etsy-oauth.json",
     "pinterestOAuth": ".credentials/pinterest-oauth.json",
+    "bufferOAuth": ".credentials/buffer-oauth.json",
     "emailProvider": ".credentials/email.json",
     "blogApi": ".credentials/blog.json"
   },
@@ -47,6 +48,7 @@
     "autoPublish": false,
     "autoSynthesize": true,
     "dashboardEnabled": true,
-    "marketingEnabled": true
+    "marketingEnabled": true,
+    "pinterestDirect": true
   }
 }

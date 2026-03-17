@@ -45,7 +45,7 @@ const VALID_CONFIG = {
   },
   notifications: { channel: 'telegram', approvalRequired: false, weeklyReviewDay: 'sunday' },
   dashboard: { port: 3737 },
-  features: { autoPublish: false, autoSynthesize: true, dashboardEnabled: true, marketingEnabled: true },
+  features: { autoPublish: false, autoSynthesize: true, dashboardEnabled: true, marketingEnabled: true, pinterestDirect: true },
 };
 
 const TEST_BRIEF: ProductBrief = {

@@ -20,6 +20,7 @@ const ConfigSchema = z.object({
   credentials: z.object({
     etsyOAuth: z.string(),
     pinterestOAuth: z.string(),
+    bufferOAuth: z.string().optional(),
     emailProvider: z.string(),
     blogApi: z.string(),
   }),
@@ -54,6 +55,7 @@ const ConfigSchema = z.object({
     autoSynthesize: z.boolean(),
     dashboardEnabled: z.boolean(),
     marketingEnabled: z.boolean(),
+    pinterestDirect: z.boolean().optional().default(true),
   }),
 });
 

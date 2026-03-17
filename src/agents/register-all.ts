@@ -252,9 +252,9 @@ export function registerAllAgents(): void {
         await client.createPin({
           title: listing.title,
           description,
-          imageUrl: listing.etsyUrl,
           link: listing.etsyUrl,
           boardId: 'default',
+          mediaSource: { sourceType: 'image_url', url: listing.etsyUrl },
         });
         pinCount++;
       } catch (error) {

@@ -1118,9 +1118,9 @@ export class CampaignCalendar {
       description:
         `Check out our ${nicheLabel} collection! ` +
         `${campaign.name} is happening now.`,
-      imageUrl: action.content.imageUrl ?? '',
       link: action.content.link ?? '',
       boardId: action.content.boardId ?? '',
+      mediaSource: { sourceType: 'image_url', url: action.content.imageUrl ?? '' },
     });
 
     logger.info(
