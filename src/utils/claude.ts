@@ -77,6 +77,38 @@ export async function callClaude(
     const startTime = performance.now();
 
     try {
+      // Use streaming for large requests to avoid timeout
+      const useStreaming = maxTokens > 16384;
+
+      if (useStreaming) {
+        const stream = client.messages.stream({
+          model,
+          max_tokens: maxTokens,
+          temperature,
+          system: systemPrompt ?? '',
+          messages: [{ role: 'user', content: prompt }],
+        });
+
+        const finalMessage = await stream.finalMessage();
+        const durationMs = Math.round(performance.now() - startTime);
+        const responseText = finalMessage.content
+          .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+          .map((block) => block.text)
+          .join('');
+
+        logger.info('Claude API call completed (streaming)', {
+          model,
+          promptLength: prompt.length,
+          responseLength: responseText.length,
+          inputTokens: finalMessage.usage.input_tokens,
+          outputTokens: finalMessage.usage.output_tokens,
+          durationMs,
+          attempt,
+        });
+
+        return responseText;
+      }
+
       const response = await client.messages.create({
         model,
         max_tokens: maxTokens,

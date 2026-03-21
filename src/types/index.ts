@@ -12,6 +12,8 @@ export type ProductStatus =
 
 export type CompetitionLevel = 'low' | 'medium' | 'high';
 
+export type ProductFormat = 'pdf' | 'spreadsheet' | 'google-sheets' | 'canva-template';
+
 export type FeedbackSource = 'design' | 'spec' | 'research';
 
 export type FeedbackDecision = 'approve' | 'reject' | 'revise';
@@ -31,6 +33,8 @@ export interface Product {
   status: ProductStatus;
   scores: ProductScores;
   briefId: string;
+  outputFormat?: ProductFormat;
+  outputPath?: string;
   pdfPath?: string;
   listingId?: string;
   createdAt: string;
@@ -41,6 +45,7 @@ export interface ProductBrief {
   id: string;
   niche: string;
   targetAudience: string;
+  outputFormat?: ProductFormat;
   pageCount: number;
   sections: string[];
   styleGuide: {
@@ -62,6 +67,7 @@ export interface Opportunity {
   keywords: string[];
   source: string;
   discoveredAt: string;
+  detectedFormat?: ProductFormat;
 }
 
 export interface FeedbackRecord {

@@ -52,8 +52,10 @@ export async function renderPdf(
   let browser: puppeteer.Browser | null = null;
 
   try {
+    const chromePath = process.env.CHROME_PATH ?? '/usr/bin/google-chrome';
     browser = await puppeteer.launch({
       headless: true,
+      executablePath: chromePath,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',

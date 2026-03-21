@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "google_sheets": {
+      "command": "mcp-google-sheets",
+      "env": {
+        "CREDENTIALS_PATH": "/home/claude-dev/projects/printpilot/.credentials/google-oauth-client.json",
+        "TOKEN_PATH": "/home/claude-dev/projects/printpilot/.credentials/mcp-token.json"
+      }
+    }
+  }
+}
